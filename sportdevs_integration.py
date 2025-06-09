@@ -91,23 +91,55 @@ class SportDevsAFLAPI:
                 return {}
     
     async def get_fixtures(self, season: str = "2025", team_id: Optional[str] = None) -> List[Dict]:
-        """Get match fixtures"""
+        """Get match fixtures from Squiggle API (more reliable for AFL)"""
         async with httpx.AsyncClient() as client:
             try:
-                params = {"season": season}
+                headers = {'User-Agent': 'AFL-SGM-Builder/1.0'}
+                url = f"https://api.squiggle.com.au/?q=games;year={season}"
                 if team_id:
-                    params['team_id'] = team_id
+                    url += f";team={team_id}"
                     
+                response = await client.get(url, headers=headers, timeout=15)
+                response.raise_for_status()
+                data = response.json()
+                return data.get('games', [])
+            except Exception as e:
+                logging.error(f"Fixtures API error: {str(e)}")
+                return []
+    
+    async def get_current_round_fixtures(self) -> List[Dict]:
+        """Get current round fixtures with live data"""
+        async with httpx.AsyncClient() as client:
+            try:
+                headers = {'User-Agent': 'AFL-SGM-Builder/1.0'}
+                # Get current round matches
                 response = await client.get(
-                    f"{self.base_url}/aussie-rules/fixtures",
-                    headers=self.headers,
-                    params=params,
+                    "https://api.squiggle.com.au/?q=games;year=2025;round=latest",
+                    headers=headers,
                     timeout=10
                 )
                 response.raise_for_status()
-                return response.json()
+                data = response.json()
+                return data.get('games', [])
             except Exception as e:
-                logging.error(f"SportDevs fixtures error: {str(e)}")
+                logging.error(f"Current round fixtures error: {str(e)}")
+                return []
+    
+    async def get_live_standings(self) -> List[Dict]:
+        """Get current 2025 AFL standings"""
+        async with httpx.AsyncClient() as client:
+            try:
+                headers = {'User-Agent': 'AFL-SGM-Builder/1.0'}
+                response = await client.get(
+                    "https://api.squiggle.com.au/?q=standings;year=2025",
+                    headers=headers,
+                    timeout=10
+                )
+                response.raise_for_status()
+                data = response.json()
+                return data.get('standings', [])
+            except Exception as e:
+                logging.error(f"Live standings error: {str(e)}")
                 return []
     
     async def get_match_statistics(self, match_id: str) -> Dict:
