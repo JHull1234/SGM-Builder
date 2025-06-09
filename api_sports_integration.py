@@ -25,39 +25,29 @@ class APISportsAFLService:
             logging.warning("APISPORTS_API_KEY not found in environment variables")
     
     async def test_api_connectivity(self) -> Dict:
-        """Test API connectivity and find working endpoints"""
+        """Test API connectivity with correct API-Sports.io AFL endpoints"""
         results = {}
         
-        for base_url in self.base_urls:
-            try:
-                # Test basic connectivity
-                response = await self.session.get(
-                    f"{base_url}/status",
-                    headers=self.headers
-                )
-                results[base_url] = {
-                    "status_code": response.status_code,
-                    "response": response.text[:200] if response.text else "No response"
-                }
-            except Exception as e:
-                results[base_url] = {"error": str(e)}
-        
-        # Try alternative endpoints
-        alternative_endpoints = [
-            "https://api.api-sports.io/aussie-rules",
-            "https://api-sports.io/v1/aussie-rules", 
-            "https://australian-football.api-sports.io/v1"
+        # Test main AFL endpoints from documentation
+        endpoints_to_test = [
+            "/timezone",
+            "/seasons", 
+            "/leagues",
+            "/teams",
+            "/players",
+            "/games"
         ]
         
-        for endpoint in alternative_endpoints:
+        for endpoint in endpoints_to_test:
             try:
                 response = await self.session.get(
-                    f"{endpoint}/seasons",
+                    f"{self.base_url}{endpoint}",
                     headers=self.headers
                 )
                 results[endpoint] = {
                     "status_code": response.status_code,
-                    "response": response.text[:200] if response.text else "No response"
+                    "response": response.text[:300] if response.text else "No response",
+                    "success": response.status_code == 200
                 }
             except Exception as e:
                 results[endpoint] = {"error": str(e)}
@@ -65,213 +55,144 @@ class APISportsAFLService:
         return results
     
     async def get_leagues_and_seasons(self) -> Dict:
-        """Get available leagues and seasons"""
-        # Try different possible endpoints for AFL data
-        possible_endpoints = [
-            "/leagues",
-            "/seasons", 
-            "/competitions",
-            "/tournaments"
-        ]
-        
-        for base_url in self.base_urls[:2]:  # Test top 2 URLs
-            for endpoint in possible_endpoints:
-                try:
-                    response = await self.session.get(
-                        f"{base_url}{endpoint}",
-                        headers=self.headers
-                    )
-                    
-                    if response.status_code == 200:
-                        data = response.json()
-                        return {
-                            "success": True,
-                            "endpoint": f"{base_url}{endpoint}",
-                            "data": data,
-                            "data_source": "API Sports"
-                        }
-                        
-                except Exception as e:
-                    continue
-        
-        return {"error": "No working leagues/seasons endpoint found"}
+        """Get available AFL leagues and seasons"""
+        try:
+            # Get seasons first
+            seasons_response = await self.session.get(
+                f"{self.base_url}/seasons",
+                headers=self.headers
+            )
+            
+            # Get leagues
+            leagues_response = await self.session.get(
+                f"{self.base_url}/leagues",
+                headers=self.headers
+            )
+            
+            return {
+                "success": True,
+                "seasons": seasons_response.json() if seasons_response.status_code == 200 else None,
+                "leagues": leagues_response.json() if leagues_response.status_code == 200 else None,
+                "seasons_status": seasons_response.status_code,
+                "leagues_status": leagues_response.status_code,
+                "data_source": "API-Sports.io AFL"
+            }
+            
+        except Exception as e:
+            return {"error": str(e)}
     
     async def get_teams(self, season: int = 2025) -> Dict:
         """Get AFL teams for the season"""
-        possible_endpoints = [
-            f"/teams?season={season}",
-            f"/teams?league=afl&season={season}",
-            f"/teams/{season}",
-            "/teams"
-        ]
-        
-        for base_url in self.base_urls[:2]:
-            for endpoint in possible_endpoints:
-                try:
-                    response = await self.session.get(
-                        f"{base_url}{endpoint}",
-                        headers=self.headers
-                    )
-                    
-                    if response.status_code == 200:
-                        data = response.json()
-                        return {
-                            "success": True,
-                            "endpoint": f"{base_url}{endpoint}",
-                            "teams": data,
-                            "data_source": "API Sports"
-                        }
-                        
-                except Exception as e:
-                    continue
-        
-        return {"error": "No working teams endpoint found"}
+        try:
+            response = await self.session.get(
+                f"{self.base_url}/teams",
+                headers=self.headers,
+                params={"season": season}
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                return {
+                    "success": True,
+                    "teams": data,
+                    "season": season,
+                    "data_source": "API-Sports.io AFL"
+                }
+            else:
+                return {
+                    "error": f"API returned status {response.status_code}",
+                    "response": response.text[:200]
+                }
+                
+        except Exception as e:
+            return {"error": str(e)}
     
     async def get_players(self, team_id: Optional[int] = None, season: int = 2025) -> Dict:
         """Get AFL players"""
-        possible_endpoints = []
-        
-        if team_id:
-            possible_endpoints.extend([
-                f"/players?team={team_id}&season={season}",
-                f"/players?team={team_id}",
-                f"/teams/{team_id}/players",
-                f"/squads?team={team_id}&season={season}"
-            ])
-        else:
-            possible_endpoints.extend([
-                f"/players?season={season}",
-                "/players",
-                f"/squads?season={season}"
-            ])
-        
-        for base_url in self.base_urls[:2]:
-            for endpoint in possible_endpoints:
-                try:
-                    response = await self.session.get(
-                        f"{base_url}{endpoint}",
-                        headers=self.headers
-                    )
-                    
-                    if response.status_code == 200:
-                        data = response.json()
-                        return {
-                            "success": True,
-                            "endpoint": f"{base_url}{endpoint}",
-                            "players": data,
-                            "data_source": "API Sports"
-                        }
-                        
-                except Exception as e:
-                    continue
-        
-        return {"error": "No working players endpoint found"}
+        try:
+            params = {"season": season}
+            if team_id:
+                params["team"] = team_id
+            
+            response = await self.session.get(
+                f"{self.base_url}/players",
+                headers=self.headers,
+                params=params
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                return {
+                    "success": True,
+                    "players": data,
+                    "season": season,
+                    "team_id": team_id,
+                    "data_source": "API-Sports.io AFL"
+                }
+            else:
+                return {
+                    "error": f"API returned status {response.status_code}",
+                    "response": response.text[:200]
+                }
+                
+        except Exception as e:
+            return {"error": str(e)}
     
     async def search_player_by_name(self, player_name: str) -> Dict:
         """Search for a specific player by name"""
-        possible_endpoints = [
-            f"/players?search={player_name}",
-            f"/players?name={player_name}",
-            f"/search/players?q={player_name}"
-        ]
-        
-        for base_url in self.base_urls[:2]:
-            for endpoint in possible_endpoints:
-                try:
-                    response = await self.session.get(
-                        f"{base_url}{endpoint}",
-                        headers=self.headers
-                    )
-                    
-                    if response.status_code == 200:
-                        data = response.json()
-                        return {
-                            "success": True,
-                            "endpoint": f"{base_url}{endpoint}",
-                            "search_results": data,
-                            "player_name": player_name,
-                            "data_source": "API Sports"
-                        }
-                        
-                except Exception as e:
-                    continue
-        
-        return {"error": f"No player data found for {player_name}"}
-    
-    async def get_player_statistics(self, player_id: int, season: int = 2025) -> Dict:
-        """Get detailed player statistics"""
-        possible_endpoints = [
-            f"/players/{player_id}/statistics?season={season}",
-            f"/players/{player_id}/stats?season={season}",
-            f"/statistics/players/{player_id}?season={season}",
-            f"/players/{player_id}?season={season}"
-        ]
-        
-        for base_url in self.base_urls[:2]:
-            for endpoint in possible_endpoints:
-                try:
-                    response = await self.session.get(
-                        f"{base_url}{endpoint}",
-                        headers=self.headers
-                    )
-                    
-                    if response.status_code == 200:
-                        data = response.json()
-                        return {
-                            "success": True,
-                            "endpoint": f"{base_url}{endpoint}",
-                            "statistics": data,
-                            "player_id": player_id,
-                            "season": season,
-                            "data_source": "API Sports"
-                        }
-                        
-                except Exception as e:
-                    continue
-        
-        return {"error": f"No statistics found for player ID {player_id}"}
+        try:
+            response = await self.session.get(
+                f"{self.base_url}/players",
+                headers=self.headers,
+                params={"search": player_name}
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                return {
+                    "success": True,
+                    "search_results": data,
+                    "player_name": player_name,
+                    "data_source": "API-Sports.io AFL"
+                }
+            else:
+                return {
+                    "error": f"API returned status {response.status_code}",
+                    "response": response.text[:200]
+                }
+                
+        except Exception as e:
+            return {"error": str(e)}
     
     async def get_matches(self, season: int = 2025, team_id: Optional[int] = None) -> Dict:
         """Get AFL matches"""
-        possible_endpoints = []
-        
-        if team_id:
-            possible_endpoints.extend([
-                f"/fixtures?team={team_id}&season={season}",
-                f"/matches?team={team_id}&season={season}",
-                f"/games?team={team_id}&season={season}"
-            ])
-        else:
-            possible_endpoints.extend([
-                f"/fixtures?season={season}",
-                f"/matches?season={season}",
-                f"/games?season={season}",
-                "/fixtures/live",
-                "/matches/live"
-            ])
-        
-        for base_url in self.base_urls[:2]:
-            for endpoint in possible_endpoints:
-                try:
-                    response = await self.session.get(
-                        f"{base_url}{endpoint}",
-                        headers=self.headers
-                    )
-                    
-                    if response.status_code == 200:
-                        data = response.json()
-                        return {
-                            "success": True,
-                            "endpoint": f"{base_url}{endpoint}",
-                            "matches": data,
-                            "season": season,
-                            "data_source": "API Sports"
-                        }
-                        
-                except Exception as e:
-                    continue
-        
-        return {"error": "No working matches endpoint found"}
+        try:
+            params = {"season": season}
+            if team_id:
+                params["team"] = team_id
+            
+            response = await self.session.get(
+                f"{self.base_url}/games",
+                headers=self.headers,
+                params=params
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                return {
+                    "success": True,
+                    "matches": data,
+                    "season": season,
+                    "data_source": "API-Sports.io AFL"
+                }
+            else:
+                return {
+                    "error": f"API returned status {response.status_code}",
+                    "response": response.text[:200]
+                }
+                
+        except Exception as e:
+            return {"error": str(e)}
     
     async def comprehensive_afl_test(self) -> Dict:
         """Comprehensive test of all AFL endpoints"""
