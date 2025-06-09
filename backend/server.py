@@ -521,10 +521,132 @@ async def get_team_statistics(team_name: str):
     """Get team defensive/offensive statistics"""
     return await AFLDataService.get_team_stats(team_name)
 
-@app.get("/api/venues")
-async def get_all_venues():
-    """Get all AFL venues"""
-    return [{"name": name, **data} for name, data in AFL_VENUES.items()]
+@app.get("/api/matchup/{player_name}/{opponent_team}")
+async def get_defensive_matchup(player_name: str, opponent_team: str):
+    """Get detailed defensive matchup analysis for player vs team"""
+    try:
+        import sys
+        sys.path.append('/app')
+        from enhanced_player_data import COMPREHENSIVE_AFL_PLAYERS, TEAM_DEFENSIVE_STATS
+        
+        # Find player data
+        player_data = None
+        for player in COMPREHENSIVE_AFL_PLAYERS:
+            if player["name"].lower() == player_name.lower():
+                player_data = player
+                break
+        
+        if not player_data:
+            raise HTTPException(404, f"Player {player_name} not found")
+        
+        if opponent_team not in TEAM_DEFENSIVE_STATS:
+            raise HTTPException(404, f"Team {opponent_team} not found")
+        
+        team_defense = TEAM_DEFENSIVE_STATS[opponent_team]
+        
+        # Calculate matchup analysis
+        analysis = {
+            "player": player_data["name"],
+            "opponent": opponent_team,
+            "base_averages": {
+                "disposals": player_data["avg_disposals"],
+                "goals": player_data["avg_goals"],
+                "marks": player_data["avg_marks"],
+                "tackles": player_data["avg_tackles"]
+            },
+            "defensive_matchup": {
+                "opponent_allows_per_game": {
+                    "total_disposals": team_defense["disposals_allowed_per_game"],
+                    "midfielder_disposals": team_defense["midfielder_disposals_allowed"],
+                    "goals": team_defense["goals_allowed_per_game"],
+                    "forward_goals": team_defense["forward_goals_allowed"]
+                },
+                "league_rank": SGMAnalytics._calculate_defensive_rank(opponent_team, team_defense),
+                "matchup_rating": SGMAnalytics._calculate_matchup_difficulty(player_data, team_defense)
+            },
+            "projected_performance": {
+                "disposals": SGMAnalytics._project_stat_vs_defense(
+                    player_data["avg_disposals"], 
+                    team_defense["midfielder_disposals_allowed"], 
+                    375.0  # League average
+                ),
+                "goals": SGMAnalytics._project_stat_vs_defense(
+                    player_data["avg_goals"],
+                    team_defense["forward_goals_allowed"],
+                    8.5  # League average
+                )
+            },
+            "key_insights": SGMAnalytics._generate_matchup_insights(player_data, opponent_team, team_defense)
+        }
+        
+        return analysis
+        
+    except Exception as e:
+        raise HTTPException(500, f"Matchup analysis error: {str(e)}")
+
+@app.get("/api/player/{player_name}/venue-performance")
+async def get_player_venue_performance(player_name: str):
+    """Get player's performance breakdown by venue"""
+    try:
+        import sys
+        sys.path.append('/app')
+        from enhanced_player_data import COMPREHENSIVE_AFL_PLAYERS
+        
+        # Find player data
+        player_data = None
+        for player in COMPREHENSIVE_AFL_PLAYERS:
+            if player["name"].lower() == player_name.lower():
+                player_data = player
+                break
+        
+        if not player_data:
+            raise HTTPException(404, f"Player {player_name} not found")
+        
+        venue_analysis = {
+            "player": player_data["name"],
+            "team": player_data["team"],
+            "season_averages": {
+                "disposals": player_data["avg_disposals"],
+                "goals": player_data["avg_goals"],
+                "marks": player_data["avg_marks"]
+            },
+            "venue_breakdown": {},
+            "best_venues": [],
+            "worst_venues": []
+        }
+        
+        # Process venue performance
+        venue_performances = []
+        for venue, stats in player_data["venue_performance"].items():
+            venue_analysis["venue_breakdown"][venue] = {
+                "disposals": stats["disposals"],
+                "goals": stats["goals"],
+                "disposal_difference": stats["disposals"] - player_data["avg_disposals"],
+                "goal_difference": stats["goals"] - player_data["avg_goals"]
+            }
+            
+            # Calculate overall performance score
+            disposal_factor = stats["disposals"] / player_data["avg_disposals"]
+            goal_factor = stats["goals"] / player_data["avg_goals"] if player_data["avg_goals"] > 0 else 1
+            overall_score = (disposal_factor + goal_factor) / 2
+            
+            venue_performances.append({
+                "venue": venue,
+                "score": overall_score,
+                "disposals": stats["disposals"],
+                "goals": stats["goals"]
+            })
+        
+        # Sort venues by performance
+        venue_performances.sort(key=lambda x: x["score"], reverse=True)
+        
+        venue_analysis["best_venues"] = venue_performances[:3]
+        venue_analysis["worst_venues"] = venue_performances[-3:]
+        
+        return venue_analysis
+        
+    except Exception as e:
+        raise HTTPException(500, f"Venue analysis error: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
