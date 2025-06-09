@@ -516,8 +516,19 @@ async def get_betting_odds():
 
 @app.post("/api/sgm/analyze")
 async def analyze_sgm(request: Dict):
-    """Analyze Same Game Multi combination"""
+    """Analyze Same Game Multi combination with advanced analytics"""
     try:
+        # Import advanced analytics
+        import sys
+        sys.path.append('/app')
+        from advanced_analytics import (
+            RecentFormAnalyzer, 
+            TeammateSymergyAnalyzer,
+            DefensiveMatchupAnalyzer,
+            InjuryImpactAnalyzer,
+            MarketMonitor
+        )
+        
         match_id = request.get("match_id")
         outcomes = request.get("outcomes", [])
         venue = request.get("venue")
@@ -528,30 +539,145 @@ async def analyze_sgm(request: Dict):
         # Get weather data for venue
         weather_data = await WeatherService.get_venue_weather(venue)
         
-        # Calculate correlation score
-        correlation_score = SGMAnalytics.calculate_correlation_score(outcomes)
+        # 1. RECENT FORM ANALYSIS
+        form_analysis = {}
+        for outcome in outcomes:
+            player = outcome.get("player")
+            stat_type = outcome.get("type")
+            if player and stat_type:
+                form_data = RecentFormAnalyzer.calculate_form_factor(player, stat_type)
+                form_analysis[f"{player}_{stat_type}"] = form_data
         
-        # Calculate weather impact
+        # 2. TEAMMATE SYNERGY ANALYSIS
+        synergy_analysis = TeammateSymergyAnalyzer.calculate_synergy_impact(outcomes)
+        
+        # 3. ENHANCED CORRELATION WITH SYNERGY
+        base_correlation = SGMAnalytics.calculate_correlation_score(outcomes)
+        synergy_adjusted_correlation = base_correlation + synergy_analysis["total_synergy_impact"]
+        synergy_adjusted_correlation = max(0.1, min(1.0, synergy_adjusted_correlation))
+        
+        # 4. DEFENSIVE MATCHUP ANALYSIS
+        matchup_analysis = {}
+        for outcome in outcomes:
+            player_name = outcome.get("player")
+            if player_name:
+                # Get player data for matchup analysis
+                import sys
+                sys.path.append('/app')
+                from enhanced_player_data import COMPREHENSIVE_AFL_PLAYERS
+                
+                player_data = None
+                for player in COMPREHENSIVE_AFL_PLAYERS:
+                    if player["name"] == player_name:
+                        player_data = player
+                        break
+                
+                if player_data:
+                    # Mock opponent team for analysis
+                    opponent_team = "Brisbane"  # In production, get from match data
+                    detailed_matchup = DefensiveMatchupAnalyzer.get_detailed_matchup_analysis(
+                        player_data, opponent_team, venue
+                    )
+                    matchup_analysis[player_name] = detailed_matchup
+        
+        # 5. INJURY IMPACT ANALYSIS
+        injury_analysis = {}
+        total_injury_impact = 0.0
+        for outcome in outcomes:
+            player = outcome.get("player")
+            if player:
+                injury_data = InjuryImpactAnalyzer.get_injury_impact(player)
+                injury_analysis[player] = injury_data
+                total_injury_impact += injury_data["performance_adjustment"]
+        
+        # 6. FORM-ADJUSTED CORRELATION
+        form_adjustment = 0.0
+        for outcome in outcomes:
+            player = outcome.get("player")
+            stat_type = outcome.get("type")
+            if player and stat_type:
+                form_key = f"{player}_{stat_type}"
+                if form_key in form_analysis:
+                    form_factor = form_analysis[form_key]["factor"]
+                    # Convert form factor to correlation adjustment
+                    if form_factor > 1.15:  # Hot form
+                        form_adjustment += 0.05
+                    elif form_factor < 0.85:  # Cold form
+                        form_adjustment -= 0.05
+        
+        # 7. CALCULATE FINAL CORRELATION SCORE
+        final_correlation = synergy_adjusted_correlation + form_adjustment
+        final_correlation = max(0.1, min(1.0, final_correlation))
+        
+        # 8. ENHANCED WEATHER IMPACT
         weather_impact = SGMAnalytics.calculate_weather_impact(weather_data, outcomes)
         
-        # Calculate value rating (simplified - would use real market odds in production)
-        mock_market_odds = 3.50  # Mock odds for demonstration
-        predicted_probability = correlation_score * (1 + weather_impact["total_impact"])
-        value_rating = SGMAnalytics.calculate_value_rating(predicted_probability, mock_market_odds)
+        # 9. CALCULATE PREDICTED PROBABILITY
+        base_probability = final_correlation
+        weather_adjusted_prob = base_probability * (1 + weather_impact["total_impact"])
+        injury_adjusted_prob = weather_adjusted_prob * (1 + total_injury_impact)
+        final_probability = max(0.05, min(0.95, injury_adjusted_prob))
         
-        # Recommended stake (basic Kelly Criterion)
-        recommended_stake = max(0, min(0.1, value_rating * 0.25)) if value_rating > 0 else 0
+        # 10. MARKET TIMING ANALYSIS
+        market_timing = {}
+        for outcome in outcomes:
+            player = outcome.get("player")
+            stat_type = outcome.get("type")
+            value = outcome.get("value")
+            if player and stat_type and value:
+                bet_description = f"{player} {value}+ {stat_type}"
+                timing_strategy = MarketMonitor.get_market_timing_strategy(bet_description)
+                market_timing[bet_description] = timing_strategy
         
+        # 11. VALUE RATING AND STAKE RECOMMENDATION
+        mock_market_odds = 3.50  # Mock odds - in production get from odds API
+        value_rating = SGMAnalytics.calculate_value_rating(final_probability, mock_market_odds)
+        
+        # Enhanced stake recommendation considering form and injuries
+        base_stake = max(0, min(0.1, value_rating * 0.25)) if value_rating > 0 else 0
+        
+        # Adjust stake based on confidence factors
+        confidence_factors = {
+            "form_confidence": sum([1 for fa in form_analysis.values() if fa["confidence"] == "High"]) / len(form_analysis) if form_analysis else 0.5,
+            "synergy_confidence": 1.0 if synergy_analysis["synergy_rating"] in ["Excellent", "Good"] else 0.7,
+            "injury_confidence": 1.0 if total_injury_impact > -0.05 else 0.6  # Reduce confidence if significant injuries
+        }
+        
+        avg_confidence = sum(confidence_factors.values()) / len(confidence_factors)
+        recommended_stake = base_stake * avg_confidence
+        
+        # 12. COMPILE COMPREHENSIVE RESULT
         result = {
             "match_id": match_id,
             "outcomes": outcomes,
-            "analysis": {
-                "correlation_score": round(correlation_score, 3),
+            "advanced_analysis": {
+                "correlation_analysis": {
+                    "base_correlation": round(base_correlation, 3),
+                    "synergy_adjusted": round(synergy_adjusted_correlation, 3),
+                    "form_adjusted": round(final_correlation, 3),
+                    "final_score": round(final_correlation, 3)
+                },
+                "recent_form": form_analysis,
+                "teammate_synergy": synergy_analysis,
+                "defensive_matchups": matchup_analysis,
+                "injury_impact": {
+                    "player_analysis": injury_analysis,
+                    "total_impact": round(total_injury_impact, 3),
+                    "overall_rating": "Healthy" if total_injury_impact > -0.05 else "Concerns"
+                },
                 "weather_impact": weather_impact,
-                "predicted_probability": round(predicted_probability, 3),
+                "market_timing": market_timing,
+                "predicted_probability": round(final_probability, 3),
                 "value_rating": round(value_rating, 3),
-                "recommended_stake": round(recommended_stake, 3),
-                "confidence": "High" if correlation_score > 0.6 else "Medium" if correlation_score > 0.4 else "Low"
+                "confidence_factors": confidence_factors,
+                "recommended_stake": round(recommended_stake, 3)
+            },
+            "summary": {
+                "confidence": "High" if final_correlation > 0.7 and avg_confidence > 0.8 else 
+                           "Medium" if final_correlation > 0.5 and avg_confidence > 0.6 else "Low",
+                "key_strengths": SGMAnalytics._identify_key_strengths(synergy_analysis, form_analysis, injury_analysis),
+                "key_concerns": SGMAnalytics._identify_key_concerns(form_analysis, injury_analysis, weather_impact),
+                "recommendation": SGMAnalytics._generate_final_recommendation(value_rating, final_correlation, avg_confidence)
             },
             "weather_conditions": weather_data,
             "timestamp": datetime.now().isoformat()
@@ -559,13 +685,13 @@ async def analyze_sgm(request: Dict):
         
         # Store analysis in database
         analysis_collection = db["sgm_analyses"]
-        result_copy = result.copy()  # Make a copy for storage
+        result_copy = result.copy()
         await analysis_collection.insert_one(result_copy)
         
         return result
         
     except Exception as e:
-        raise HTTPException(500, f"SGM analysis error: {str(e)}")
+        raise HTTPException(500, f"Advanced SGM analysis error: {str(e)}")
 
 @app.get("/api/sgm/history")
 async def get_sgm_history():
