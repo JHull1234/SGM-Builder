@@ -270,50 +270,27 @@ class EnhancedRecentFormAnalyzer:
     async def get_bulletproof_recent_form(self, player_name: str, stat_type: str) -> Dict:
         """Get bulletproof recent form analysis using real data"""
         
-        # Get real recent form data
-        recent_form = await self.data_provider.get_player_recent_form(player_name, 5)
-        
-        if recent_form["data_source"] == "no_data":
+        # Use our new bulletproof system
+        import sys
+        sys.path.append('/app')
+        try:
+            from bulletproof_form_analyzer import BulletproofFormAnalyzer
+            
+            analyzer = BulletproofFormAnalyzer()
+            real_form_data = analyzer.get_real_recent_form(player_name, stat_type)
+            
+            return real_form_data
+            
+        except Exception as e:
+            print(f"Bulletproof analyzer error: {e}")
+            # Fallback to conservative estimates
             return {
-                "factor": 1.0,
-                "confidence": "None",
+                "factor": 0.95,  # Conservative assumption
+                "confidence": "Low",
                 "trend": "Unknown",
-                "reliability": "NONE - No real data available",
-                "recommendation": "AVOID - Insufficient data for reliable prediction"
+                "data_source": "fallback",
+                "recommendation": "CAUTION - Limited data reliability"
             }
-        
-        # Calculate form factor
-        recent_avg = recent_form["recent_averages"].get(stat_type, 0)
-        
-        # Get season average (from our existing player database)
-        season_avg = self._get_season_average(player_name, stat_type)
-        
-        if season_avg > 0:
-            form_factor = recent_avg / season_avg
-        else:
-            form_factor = 1.0
-        
-        # Calculate confidence based on data source
-        confidence_map = {
-            "real_api": "High",
-            "fallback_mock": "Low", 
-            "no_data": "None"
-        }
-        
-        confidence = confidence_map.get(recent_form["data_source"], "Low")
-        trend = recent_form["trends"].get(stat_type, "Unknown")
-        
-        return {
-            "factor": round(form_factor, 3),
-            "recent_avg": round(recent_avg, 1),
-            "season_avg": season_avg,
-            "confidence": confidence,
-            "trend": trend,
-            "games_analyzed": recent_form["games_analyzed"],
-            "data_source": recent_form["data_source"],
-            "reliability": recent_form.get("reliability", "Good"),
-            "recommendation": self._generate_form_recommendation(form_factor, confidence, trend)
-        }
     
     def _get_season_average(self, player_name: str, stat_type: str) -> float:
         """Get season average from our player database"""
