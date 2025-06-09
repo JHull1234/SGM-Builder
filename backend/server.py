@@ -1466,6 +1466,172 @@ async def analyze_sgm_with_api_sports(combination_data: Dict):
         logging.error(f"API Sports SGM analysis error: {str(e)}")
         raise HTTPException(500, f"API Sports SGM analysis failed: {str(e)}")
 
+@api_router.post("/sgm/manual-data-analyze")
+async def analyze_sgm_with_manual_data(manual_data: Dict):
+    """Analyze SGM using manually provided current player statistics"""
+    try:
+        venue = manual_data.get('venue', 'MCG')
+        match_date = manual_data.get('date', datetime.now().isoformat())
+        player_data = manual_data.get('player_data', {})
+        selections = manual_data.get('selections', [])
+        
+        if not player_data or not selections:
+            raise HTTPException(400, "Both player_data and selections are required")
+        
+        # Get weather data
+        weather_data = await weather_service.get_weather_for_venue(venue)
+        
+        # Analyze each selection using manual data
+        manual_analysis = []
+        
+        for selection in selections:
+            player_name = selection["player"]
+            stat_type = selection["stat_type"] 
+            threshold = selection["threshold"]
+            
+            if player_name not in player_data:
+                manual_analysis.append({
+                    "player": player_name,
+                    "error": f"No manual data provided for {player_name}"
+                })
+                continue
+            
+            player_stats = player_data[player_name]
+            
+            # Calculate probability using manual data
+            season_avg = player_stats.get("season_average", {}).get(stat_type, 0)
+            recent_games = player_stats.get("recent_games", [])
+            
+            if recent_games:
+                recent_values = [game.get(stat_type, 0) for game in recent_games]
+                recent_avg = sum(recent_values) / len(recent_values)
+                
+                # Statistical analysis
+                import numpy as np
+                from scipy import stats
+                
+                # Form factor
+                form_factor = recent_avg / season_avg if season_avg > 0 else 1.0
+                
+                # Expected performance (weighted recent form)
+                expected_value = recent_avg * 0.7 + season_avg * 0.3
+                
+                # Calculate standard deviation from recent games
+                if len(recent_values) > 2:
+                    std_dev = np.std(recent_values)
+                else:
+                    std_dev = expected_value * 0.25
+                
+                # Probability calculation
+                if std_dev > 0:
+                    z_score = (threshold - expected_value) / std_dev
+                    probability = 1 - stats.norm.cdf(z_score)
+                    probability = max(0.05, min(0.95, probability))
+                else:
+                    probability = 0.5
+                
+                # Weather adjustments
+                weather_impact = 1.0
+                if weather_data and stat_type == "disposals":
+                    wind_speed = weather_data.get('wind_speed', 0)
+                    if wind_speed > 25:
+                        weather_impact *= 0.98  # -2% for high wind
+                
+                final_probability = probability * weather_impact
+                
+                manual_analysis.append({
+                    "player": player_name,
+                    "stat_type": stat_type,
+                    "threshold": threshold,
+                    "season_average": season_avg,
+                    "recent_average": round(recent_avg, 1),
+                    "recent_games": recent_values,
+                    "form_factor": round(form_factor, 3),
+                    "expected_value": round(expected_value, 1),
+                    "probability": round(final_probability, 3),
+                    "weather_impact": round(weather_impact, 3),
+                    "confidence": "High" if len(recent_values) >= 5 else "Medium",
+                    "data_source": "Manual Input (Real Statistics)"
+                })
+            else:
+                manual_analysis.append({
+                    "player": player_name,
+                    "error": "No recent games data provided"
+                })
+        
+        # Calculate combined SGM probability
+        individual_probs = [pred["probability"] for pred in manual_analysis if "probability" in pred]
+        
+        if individual_probs:
+            combined_prob = 1.0
+            for prob in individual_probs:
+                combined_prob *= prob
+            
+            # Apply correlation adjustments
+            correlation_factor = 0.95 if len(individual_probs) > 1 else 1.0
+            final_combined_prob = combined_prob * correlation_factor
+            
+            implied_odds = 1 / final_combined_prob if final_combined_prob > 0 else 999
+            
+            # Generate recommendation
+            if final_combined_prob > 0.30:
+                recommendation = f"🔥 EXCELLENT VALUE - {final_combined_prob*100:.1f}% chance at ${implied_odds:.2f}"
+            elif final_combined_prob > 0.20:
+                recommendation = f"✅ GOOD VALUE - {final_combined_prob*100:.1f}% chance at ${implied_odds:.2f}"
+            elif final_combined_prob > 0.15:
+                recommendation = f"⚠️ FAIR VALUE - {final_combined_prob*100:.1f}% chance at ${implied_odds:.2f}"
+            else:
+                recommendation = f"❌ POOR VALUE - {final_combined_prob*100:.1f}% chance at ${implied_odds:.2f}"
+        else:
+            final_combined_prob = 0
+            implied_odds = 999
+            recommendation = "❌ Cannot calculate - insufficient data"
+        
+        result = {
+            "analysis_type": "Manual Data SGM Analysis",
+            "match_info": {
+                "venue": venue,
+                "date": match_date,
+                "analysis_timestamp": datetime.now().isoformat()
+            },
+            "weather_conditions": weather_data,
+            "player_analysis": manual_analysis,
+            "sgm_summary": {
+                "individual_probabilities": individual_probs,
+                "combined_probability": round(final_combined_prob, 4),
+                "implied_odds": round(implied_odds, 2),
+                "recommendation": recommendation,
+                "confidence": "High" if all(p.get("confidence") == "High" for p in manual_analysis if "confidence" in p) else "Medium"
+            },
+            "data_sources": {
+                "player_data": "Manual Input (Real Statistics)",
+                "weather": "WeatherAPI (Live)",
+                "analysis": "Advanced Statistical Modeling"
+            }
+        }
+        
+        # Store manual analysis
+        analysis_doc = {
+            "venue": venue,
+            "date": match_date,
+            "player_data": player_data,
+            "selections": selections,
+            "weather_data": weather_data,
+            "manual_analysis": manual_analysis,
+            "sgm_summary": result["sgm_summary"],
+            "analysis_type": "manual_data",
+            "created_at": datetime.utcnow()
+        }
+        await db.manual_sgm_analysis.insert_one(analysis_doc)
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Manual SGM analysis error: {str(e)}")
+        raise HTTPException(500, f"Manual SGM analysis failed: {str(e)}")
+
 import statistics
 
 # Include the router in the main app
