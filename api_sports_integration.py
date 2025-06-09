@@ -15,7 +15,8 @@ class APISportsAFLService:
         self.api_key = os.environ.get('APISPORTS_API_KEY')
         self.base_url = "https://api-sports.io"
         self.headers = {
-            'Authorization': f'Bearer {self.api_key}',
+            'x-rapidapi-key': self.api_key,
+            'x-rapidapi-host': 'api-sports.io',
             'Content-Type': 'application/json'
         }
         self.session = httpx.AsyncClient(timeout=30.0)
