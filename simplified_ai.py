@@ -431,3 +431,78 @@ class SimplifiedForumMonitor:
             "sentiment_summary": self._get_sentiment_summary(),
             "last_updated": datetime.now().isoformat()
         }
+    
+    def _get_consensus_plays(self) -> List[Dict]:
+        """Get consensus plays from forum data"""
+        consensus_plays = []
+        
+        # Group by player and stat
+        play_groups = {}
+        for play in self.mock_forum_data["sharp_plays"]:
+            key = (play["player_mentioned"], play["stat_mentioned"])
+            if key not in play_groups:
+                play_groups[key] = []
+            play_groups[key].append(play)
+        
+        # Find consensus plays
+        for (player, stat), plays in play_groups.items():
+            if len(plays) >= 2:
+                avg_confidence = sum(p["confidence"] for p in plays) / len(plays)
+                total_upvotes = sum(p["upvotes"] for p in plays)
+                
+                consensus_plays.append({
+                    "player": player,
+                    "stat_type": stat,
+                    "line": plays[0]["line_mentioned"],
+                    "confidence": avg_confidence,
+                    "total_upvotes": total_upvotes,
+                    "num_mentions": len(plays)
+                })
+        
+        return consensus_plays
+    
+    def _get_contrarian_opportunities(self) -> List[Dict]:
+        """Get contrarian betting opportunities"""
+        opportunities = []
+        
+        for play in self.mock_forum_data["sharp_plays"]:
+            # Look for plays with low upvotes but high confidence
+            if play["upvotes"] < 10 and play["confidence"] > 0.7:
+                opportunities.append({
+                    "player": play["player_mentioned"],
+                    "stat_type": play["stat_mentioned"],
+                    "line": play["line_mentioned"],
+                    "confidence": play["confidence"],
+                    "upvotes": play["upvotes"],
+                    "reasoning": "High confidence but under the radar"
+                })
+        
+        return opportunities
+    
+    def _get_sentiment_summary(self) -> Dict:
+        """Get overall sentiment summary"""
+        total_confidence = 0
+        total_plays = len(self.mock_forum_data["sharp_plays"])
+        
+        injury_severity = {
+            "High": 3,
+            "Medium": 2,
+            "Low": 1
+        }
+        
+        injury_impact = sum(
+            injury_severity.get(intel["severity"], 0) * intel["reliability"]
+            for intel in self.mock_forum_data["injury_intel"]
+        )
+        
+        avg_confidence = (
+            sum(play["confidence"] for play in self.mock_forum_data["sharp_plays"]) / 
+            total_plays if total_plays > 0 else 0
+        )
+        
+        return {
+            "overall_confidence": avg_confidence,
+            "injury_impact": injury_impact,
+            "total_plays_analyzed": total_plays,
+            "total_injury_reports": len(self.mock_forum_data["injury_intel"])
+        }
