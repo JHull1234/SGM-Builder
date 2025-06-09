@@ -9,6 +9,10 @@ from typing import List, Dict, Optional
 import uuid
 from pydantic import BaseModel
 import statistics
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 app = FastAPI(title="AFL Same Game Multi Analytics", version="1.0.0")
 
