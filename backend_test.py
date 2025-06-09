@@ -332,9 +332,18 @@ class AFLSGMBuilderAPITester(unittest.TestCase):
 def run_tests():
     """Run all API tests"""
     test_suite = unittest.TestSuite()
+    
+    # Core API tests
     test_suite.addTest(AFLSGMBuilderAPITester('test_01_root_endpoint'))
     test_suite.addTest(AFLSGMBuilderAPITester('test_02_teams_endpoint'))
     test_suite.addTest(AFLSGMBuilderAPITester('test_03_weather_endpoint'))
+    
+    # 2025 AFL Season Data Tests (Priority)
+    test_suite.addTest(AFLSGMBuilderAPITester('test_10_data_status_endpoint'))
+    test_suite.addTest(AFLSGMBuilderAPITester('test_11_current_fixtures_endpoint'))
+    test_suite.addTest(AFLSGMBuilderAPITester('test_12_live_standings_endpoint'))
+    
+    # Additional API tests
     test_suite.addTest(AFLSGMBuilderAPITester('test_04_fixtures_endpoint'))
     test_suite.addTest(AFLSGMBuilderAPITester('test_05_injuries_endpoint'))
     test_suite.addTest(AFLSGMBuilderAPITester('test_06_odds_endpoint'))
