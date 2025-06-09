@@ -100,7 +100,8 @@ const SGMBuilder = () => {
 
     setLoading(true);
     try {
-      const response = await axios.post(`${API}/sgm/analyze`, {
+      // Use the advanced SGM analysis endpoint for better features
+      const response = await axios.post(`${API}/sgm/advanced-analyze`, {
         match_id: selectedMatch.id,
         venue: selectedMatch.venue,
         date: selectedMatch.date,
@@ -114,7 +115,7 @@ const SGMBuilder = () => {
       setSgmAnalysis(response.data);
     } catch (error) {
       console.error("Error analyzing SGM:", error);
-      alert("Error analyzing SGM. Please try again.");
+      alert("Error analyzing SGM: " + (error.response?.data?.detail || "Please try again"));
     } finally {
       setLoading(false);
     }
