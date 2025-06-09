@@ -22,6 +22,7 @@ from advanced_analytics import (
     TEAM_DEFENSIVE_STATS
 )
 from real_afl_data import RealAFLDataCollector, EnhancedSGMAnalyzer
+from sportdevs_integration import SportDevsAPIService, LiveAFLAnalyzer
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
