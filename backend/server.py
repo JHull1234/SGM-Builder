@@ -1132,7 +1132,7 @@ async def ai_recommend_sgm(request: Dict):
         import sys
         sys.path.append('/app')
         from enhanced_player_data import COMPREHENSIVE_AFL_PLAYERS
-        from ml_sgm_picker import AutomatedSGMPicker, MachineLearningPredictor
+        from simplified_ai import SimplifiedMLPredictor, SimplifiedSGMPicker
         
         target_odds = request.get("target_odds")
         match_context = request.get("match_context", {})
@@ -1144,9 +1144,9 @@ async def ai_recommend_sgm(request: Dict):
         if target_odds < 1.1 or target_odds > 50:
             raise HTTPException(400, "target_odds must be between 1.1 and 50")
         
-        # Initialize ML predictor (mock for now)
-        ml_predictor = MachineLearningPredictor()
-        sgm_picker = AutomatedSGMPicker(ml_predictor)
+        # Initialize AI predictor
+        ml_predictor = SimplifiedMLPredictor()
+        sgm_picker = SimplifiedSGMPicker(ml_predictor)
         
         # Use available players (limit for performance)
         available_players = COMPREHENSIVE_AFL_PLAYERS[:10]  # Top 10 players for demo
@@ -1167,18 +1167,31 @@ async def ai_recommend_sgm(request: Dict):
                 "expected_movement": "Odds typically drift upward"
             }
             
-            # Add confidence breakdown
-            confidence_breakdown = {
-                "ml_confidence": rec["confidence_score"],
-                "correlation_confidence": 0.8 if rec["correlation_adjustment"] > 0 else 0.6,
-                "overall_rating": "High" if rec["confidence_score"] > 0.8 else "Medium"
-            }
+            # Add AI insights
+            ai_insights = []
+            if rec["value_rating"] > 0.15:
+                ai_insights.append("🎯 Exceptional value detected - market significantly underpriced")
+            
+            if rec["correlation_adjustment"] > 0:
+                ai_insights.append("🤝 Positive teammate synergy boosts success probability")
+            
+            if rec["confidence_score"] > 0.8:
+                ai_insights.append("📊 High confidence in predictions for all outcomes")
+            
+            # Add outcome-specific insights
+            for outcome in rec["sgm_outcomes"]:
+                if outcome["predicted"] > outcome["target"] * 1.2:
+                    ai_insights.append(f"💪 {outcome['player']} tracking well above {outcome['stat_type']} target")
             
             enhanced_rec = {
                 **rec,
                 "timing_advice": timing_advice,
-                "confidence_breakdown": confidence_breakdown,
-                "ai_insights": sgm_picker._generate_ai_insights(rec)
+                "ai_insights": ai_insights[:3],  # Top 3 insights
+                "confidence_breakdown": {
+                    "prediction_confidence": rec["confidence_score"],
+                    "correlation_confidence": 0.8 if rec["correlation_adjustment"] > 0 else 0.6,
+                    "overall_rating": "High" if rec["confidence_score"] > 0.8 else "Medium"
+                }
             }
             
             enhanced_recommendations.append(enhanced_rec)
@@ -1188,14 +1201,14 @@ async def ai_recommend_sgm(request: Dict):
             "ai_recommendations": enhanced_recommendations,
             "total_combinations_analyzed": recommendations["total_combinations_analyzed"],
             "match_context": match_context,
-            "ai_recommendation_summary": _generate_ai_summary(enhanced_recommendations, target_odds),
+            "ai_recommendation_summary": _generate_ai_summary_simple(enhanced_recommendations, target_odds),
             "generated_at": datetime.now().isoformat()
         }
         
     except Exception as e:
         raise HTTPException(500, f"AI SGM recommendation error: {str(e)}")
 
-def _generate_ai_summary(recommendations: List[Dict], target_odds: float) -> Dict:
+def _generate_ai_summary_simple(recommendations: List[Dict], target_odds: float) -> Dict:
     """Generate AI summary of recommendations"""
     
     if not recommendations:
