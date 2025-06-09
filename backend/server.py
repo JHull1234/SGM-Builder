@@ -21,6 +21,7 @@ from advanced_analytics import (
     ENHANCED_PLAYER_DATA,
     TEAM_DEFENSIVE_STATS
 )
+from real_afl_data import RealAFLDataCollector, EnhancedSGMAnalyzer
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
