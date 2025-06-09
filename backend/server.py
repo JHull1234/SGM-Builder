@@ -484,6 +484,11 @@ class SGMAnalytics:
         
         return insights[:3]  # Return top 3 insights
 
+@app.get("/api/venues")
+async def get_all_venues():
+    """Get all AFL venues"""
+    return [{"name": name, **data} for name, data in AFL_VENUES.items()]
+
 # API Endpoints
 @app.get("/")
 async def root():
