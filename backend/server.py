@@ -211,6 +211,10 @@ weather_service = WeatherService()
 odds_service = OddsService()
 squiggle_service = SquiggleService()
 
+# Initialize ML and advanced analytics
+ml_predictor = MachineLearningPredictor()
+automated_sgm_picker = AutomatedSGMPicker(ml_predictor)
+
 # SGM Analysis Engine
 class SGMAnalyzer:
     def __init__(self):
