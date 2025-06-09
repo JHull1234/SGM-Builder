@@ -9,7 +9,7 @@ class AFLSGMBuilderAPITester(unittest.TestCase):
     def __init__(self, *args, **kwargs):
         super(AFLSGMBuilderAPITester, self).__init__(*args, **kwargs)
         self.base_url = "https://5f8277a1-b7cf-4159-a607-d66ea1780bac.preview.emergentagent.com/api"
-        self.test_venues = ["MCG", "Marvel Stadium", "Adelaide Oval"]
+        self.test_venues = ["MCG", "Marvel Stadium", "Adelaide Oval", "SCG", "Sydney Showground"]
         self.test_match_id = "demo_123"  # Using demo match ID
 
     def test_01_root_endpoint(self):
