@@ -94,20 +94,40 @@ async def init_venues_collection():
             upsert=True
         )
 
-# Real-time monitoring instances
-odds_monitor = None
-steam_detector = None
+# Import ML and advanced features
+from datetime import datetime
+import uuid
+import asyncio
+
+# Global ML instances
+ml_predictor = None
+forum_monitor = None
+sgm_picker = None
 
 @app.on_event("startup")
 async def startup_event():
-    global odds_monitor, steam_detector
+    global odds_monitor, steam_detector, ml_predictor, forum_monitor, sgm_picker
     await init_venues_collection()
     
     # Initialize real-time monitoring
     odds_monitor = RealTimeOddsMonitor(ODDS_API_KEY)
     steam_detector = SteamMoveDetector()
     
-    print("🚀 AFL Analytics Platform started with real-time monitoring")
+    # Initialize ML components
+    try:
+        import sys
+        sys.path.append('/app')
+        from ml_sgm_picker import MachineLearningPredictor, ForumMonitor, AutomatedSGMPicker
+        
+        ml_predictor = MachineLearningPredictor()
+        forum_monitor = ForumMonitor()
+        sgm_picker = AutomatedSGMPicker(ml_predictor)
+        
+        print("🤖 ML SGM Picker and Forum Monitor initialized")
+    except Exception as e:
+        print(f"ML initialization warning: {e}")
+    
+    print("🚀 AFL Analytics Platform started with full AI capabilities")
 
 class AFLDataService:
     @staticmethod
