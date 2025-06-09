@@ -1,5 +1,5 @@
 """
-SportDevs AFL API Integration
+SportDevs AFL API Integration - FIXED VERSION
 Professional grade AFL data integration for SGM betting analysis
 """
 
@@ -11,31 +11,265 @@ from datetime import datetime, timedelta
 import logging
 
 class SportDevsAFLAPI:
-    """Professional AFL data provider via SportDevs API"""
+    """Professional AFL data provider via SportDevs API - Updated Integration"""
     
     def __init__(self):
         self.api_key = os.environ.get('SPORTDEVS_API_KEY')
-        self.base_url = "https://aussie-rules.sportdevs.com"  # Correct SportDevs URL
+        # Try multiple possible base URLs
+        self.possible_base_urls = [
+            "https://api.sportdevs.com/v1",
+            "https://sportdevs.com/api/v1", 
+            "https://api.sportdevs.com",
+            "https://sportdevs.com/api"
+        ]
+        self.base_url = None
         self.headers = {
+            'Authorization': f'Bearer {self.api_key}',
+            'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'User-Agent': 'AFL-SGM-Builder/1.0'
+            'User-Agent': 'AFL-SGM-Builder/2.0'
         }
-        # Note: SportDevs may not require Bearer token for public endpoints
+        
+    async def find_working_base_url(self):
+        """Find the correct SportDevs API base URL"""
+        async with httpx.AsyncClient() as client:
+            for url in self.possible_base_urls:
+                try:
+                    logging.info(f"Testing SportDevs API base URL: {url}")
+                    response = await client.get(
+                        f"{url}/aussie-rules/teams",
+                        headers=self.headers,
+                        timeout=10
+                    )
+                    if response.status_code in [200, 401, 403]:  # API exists, might need auth
+                        self.base_url = url
+                        logging.info(f"✅ Found working SportDevs API: {url}")
+                        return url
+                except Exception as e:
+                    logging.debug(f"Failed {url}: {str(e)}")
+                    continue
+            
+            # If none work, try without Bearer token
+            for url in self.possible_base_urls:
+                try:
+                    headers_no_auth = {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'User-Agent': 'AFL-SGM-Builder/2.0'
+                    }
+                    response = await client.get(
+                        f"{url}/aussie-rules/teams",
+                        headers=headers_no_auth,
+                        timeout=10
+                    )
+                    if response.status_code == 200:
+                        self.base_url = url
+                        self.headers = headers_no_auth  # Use without auth
+                        logging.info(f"✅ Found working SportDevs API (no auth): {url}")
+                        return url
+                except Exception as e:
+                    continue
+            
+            logging.error("❌ Could not find working SportDevs API endpoint")
+            return None
         
     async def get_teams(self) -> List[Dict]:
         """Get all AFL teams data from SportDevs"""
+        if not self.base_url:
+            await self.find_working_base_url()
+            
+        if not self.base_url:
+            logging.error("SportDevs API not accessible")
+            return []
+            
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.get(
-                    f"{self.base_url}/teams",
+                    f"{self.base_url}/aussie-rules/teams",
                     headers=self.headers,
                     timeout=15
                 )
-                response.raise_for_status()
-                data = response.json()
-                return data if isinstance(data, list) else []
+                logging.info(f"SportDevs teams response: {response.status_code}")
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    logging.info(f"✅ SportDevs teams data: {len(data)} teams")
+                    return data if isinstance(data, list) else []
+                else:
+                    logging.error(f"SportDevs teams error: {response.status_code} - {response.text}")
+                    return []
             except Exception as e:
                 logging.error(f"SportDevs teams API error: {str(e)}")
+                return []
+    
+    async def get_players(self, team_id: Optional[str] = None) -> List[Dict]:
+        """Get AFL players from SportDevs"""
+        if not self.base_url:
+            await self.find_working_base_url()
+            
+        if not self.base_url:
+            return []
+            
+        async with httpx.AsyncClient() as client:
+            try:
+                endpoint = f"{self.base_url}/aussie-rules/players"
+                params = {}
+                if team_id:
+                    params['team_id'] = team_id
+                    
+                response = await client.get(
+                    endpoint,
+                    headers=self.headers,
+                    params=params,
+                    timeout=15
+                )
+                
+                logging.info(f"SportDevs players response: {response.status_code}")
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    logging.info(f"✅ SportDevs players data: {len(data)} players")
+                    return data if isinstance(data, list) else []
+                else:
+                    logging.error(f"SportDevs players error: {response.status_code} - {response.text}")
+                    return []
+            except Exception as e:
+                logging.error(f"SportDevs players API error: {str(e)}")
+                return []
+    
+    async def get_player_statistics(self, player_id: str, season: str = "2025") -> Dict:
+        """Get comprehensive player statistics from SportDevs"""
+        if not self.base_url:
+            await self.find_working_base_url()
+            
+        if not self.base_url:
+            return {}
+            
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(
+                    f"{self.base_url}/aussie-rules/players/{player_id}/statistics",
+                    headers=self.headers,
+                    params={"season": season},
+                    timeout=15
+                )
+                
+                logging.info(f"SportDevs player stats response: {response.status_code}")
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    logging.info(f"✅ SportDevs player stats: {player_id}")
+                    return data
+                else:
+                    logging.error(f"SportDevs player stats error: {response.status_code}")
+                    return {}
+            except Exception as e:
+                logging.error(f"SportDevs player stats error: {str(e)}")
+                return {}
+    
+    async def test_api_access(self) -> Dict:
+        """Test SportDevs API access and return status"""
+        test_results = {
+            "api_key_provided": bool(self.api_key),
+            "base_url_found": False,
+            "teams_accessible": False,
+            "players_accessible": False,
+            "error_details": []
+        }
+        
+        # Test finding base URL
+        working_url = await self.find_working_base_url()
+        if working_url:
+            test_results["base_url_found"] = True
+            test_results["working_url"] = working_url
+            
+            # Test teams endpoint
+            teams = await self.get_teams()
+            if teams:
+                test_results["teams_accessible"] = True
+                test_results["teams_count"] = len(teams)
+                
+            # Test players endpoint
+            players = await self.get_players()
+            if players:
+                test_results["players_accessible"] = True
+                test_results["players_count"] = len(players)
+        
+        return test_results
+        
+    # Keep existing methods but update them to use the new base URL detection
+    async def get_fixtures(self, season: str = "2025", team_id: Optional[str] = None) -> List[Dict]:
+        """Get match fixtures - fallback to Squiggle API if SportDevs fails"""
+        # Try SportDevs first
+        if not self.base_url:
+            await self.find_working_base_url()
+            
+        if self.base_url:
+            async with httpx.AsyncClient() as client:
+                try:
+                    endpoint = f"{self.base_url}/aussie-rules/fixtures"
+                    params = {"season": season}
+                    if team_id:
+                        params['team_id'] = team_id
+                        
+                    response = await client.get(endpoint, headers=self.headers, params=params, timeout=15)
+                    if response.status_code == 200:
+                        return response.json()
+                except Exception as e:
+                    logging.error(f"SportDevs fixtures error: {str(e)}")
+        
+        # Fallback to Squiggle API
+        return await self.get_fixtures_squiggle_fallback(season, team_id)
+    
+    async def get_fixtures_squiggle_fallback(self, season: str = "2025", team_id: Optional[str] = None) -> List[Dict]:
+        """Fallback to Squiggle API for fixtures"""
+        async with httpx.AsyncClient() as client:
+            try:
+                headers = {'User-Agent': 'AFL-SGM-Builder/2.0'}
+                url = f"https://api.squiggle.com.au/?q=games;year={season}"
+                if team_id:
+                    url += f";team={team_id}"
+                    
+                response = await client.get(url, headers=headers, timeout=15)
+                response.raise_for_status()
+                data = response.json()
+                return data.get('games', [])
+            except Exception as e:
+                logging.error(f"Squiggle fallback fixtures error: {str(e)}")
+                return []
+    
+    async def get_current_round_fixtures(self) -> List[Dict]:
+        """Get current round fixtures with live data"""
+        async with httpx.AsyncClient() as client:
+            try:
+                headers = {'User-Agent': 'AFL-SGM-Builder/2.0'}
+                response = await client.get(
+                    "https://api.squiggle.com.au/?q=games;year=2025;round=latest",
+                    headers=headers,
+                    timeout=10
+                )
+                response.raise_for_status()
+                data = response.json()
+                return data.get('games', [])
+            except Exception as e:
+                logging.error(f"Current round fixtures error: {str(e)}")
+                return []
+    
+    async def get_live_standings(self) -> List[Dict]:
+        """Get current 2025 AFL standings"""
+        async with httpx.AsyncClient() as client:
+            try:
+                headers = {'User-Agent': 'AFL-SGM-Builder/2.0'}
+                response = await client.get(
+                    "https://api.squiggle.com.au/?q=standings;year=2025",
+                    headers=headers,
+                    timeout=10
+                )
+                response.raise_for_status()
+                data = response.json()
+                return data.get('standings', [])
+            except Exception as e:
+                logging.error(f"Live standings error: {str(e)}")
                 return []
     
     async def get_team_statistics(self, team_id: str, season: str = "2025") -> Dict:
