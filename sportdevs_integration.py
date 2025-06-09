@@ -13,7 +13,7 @@ class SportDevsAPIService:
     
     def __init__(self):
         self.api_key = os.environ.get('SPORTDEVS_API_KEY')
-        self.base_url = os.environ.get('SPORTDEVS_BASE_URL', 'https://api.sportdevs.com/aussie-rules/v1')
+        self.base_url = "https://aussie-rules.sportdevs.com"
         self.headers = {
             'Authorization': f'Bearer {self.api_key}',
             'Content-Type': 'application/json'
