@@ -482,7 +482,89 @@ class SGMAnalytics:
         if len(insights) < 3:
             insights.append("Consider venue-specific performance when finalizing bet")
         
+    @staticmethod
+    def _generate_matchup_insights(player: Dict, opponent: str, team_defense: Dict) -> List[str]:
+        """Generate key insights for the matchup"""
+        insights = []
+        
+        # Defensive strength insight
+        if team_defense["midfielder_disposals_allowed"] < 115:
+            insights.append(f"{opponent} has a strong midfield defense - expect reduced disposal numbers")
+        elif team_defense["midfielder_disposals_allowed"] > 130:
+            insights.append(f"{opponent} allows high disposal counts - favorable matchup for midfielders")
+        
+        # Goal scoring insight
+        if team_defense["forward_goals_allowed"] < 7:
+            insights.append(f"{opponent} has excellent forward defense - goals will be hard to come by")
+        elif team_defense["forward_goals_allowed"] > 9:
+            insights.append(f"{opponent} defense leaks goals - good scoring opportunities expected")
+        
+        # Player-specific insight
+        if player["position"] == "Midfielder" and team_defense["tackles_per_game"] > 70:
+            insights.append(f"High tackling pressure from {opponent} may impact disposal efficiency")
+        
+        # Venue insight (if available)
+        player_venues = player.get("venue_performance", {})
+        if len(insights) < 3:
+            insights.append("Consider venue-specific performance when finalizing bet")
+        
         return insights[:3]  # Return top 3 insights
+    
+    @staticmethod
+    def _identify_key_strengths(synergy_analysis: Dict, form_analysis: Dict, injury_analysis: Dict) -> List[str]:
+        """Identify key strengths of the SGM"""
+        strengths = []
+        
+        # Synergy strengths
+        if synergy_analysis["synergy_rating"] in ["Excellent", "Good"]:
+            strengths.append(f"Strong teammate synergy ({synergy_analysis['synergy_rating'].lower()})")
+        
+        # Form strengths
+        hot_players = [key.split('_')[0] for key, data in form_analysis.items() if data["trend"] == "Hot"]
+        if hot_players:
+            strengths.append(f"Players in hot form: {', '.join(set(hot_players))}")
+        
+        # Health strengths
+        healthy_players = [player for player, data in injury_analysis.items() if data["impact_rating"] == "None"]
+        if len(healthy_players) == len(injury_analysis):
+            strengths.append("All players healthy - no injury concerns")
+        
+        return strengths[:3]
+    
+    @staticmethod
+    def _identify_key_concerns(form_analysis: Dict, injury_analysis: Dict, weather_impact: Dict) -> List[str]:
+        """Identify key concerns with the SGM"""
+        concerns = []
+        
+        # Form concerns
+        cold_players = [key.split('_')[0] for key, data in form_analysis.items() if data["trend"] == "Cold"]
+        if cold_players:
+            concerns.append(f"Players in cold form: {', '.join(set(cold_players))}")
+        
+        # Injury concerns
+        injured_players = [player for player, data in injury_analysis.items() if data["impact_rating"] in ["Medium", "High"]]
+        if injured_players:
+            concerns.append(f"Injury concerns: {', '.join(injured_players)}")
+        
+        # Weather concerns
+        if weather_impact["total_impact"] < -0.1:
+            concerns.append("Weather conditions may negatively impact performance")
+        
+        return concerns[:3]
+    
+    @staticmethod
+    def _generate_final_recommendation(value_rating: float, correlation: float, confidence: float) -> str:
+        """Generate final betting recommendation"""
+        if value_rating > 0.3 and correlation > 0.7 and confidence > 0.8:
+            return "STRONG BET - Excellent value with high confidence"
+        elif value_rating > 0.1 and correlation > 0.6 and confidence > 0.7:
+            return "GOOD BET - Solid value with reasonable confidence"
+        elif value_rating > 0 and correlation > 0.5:
+            return "CONSIDER - Positive value but monitor closely"
+        elif value_rating > -0.1:
+            return "MARGINAL - Limited value, proceed with caution"
+        else:
+            return "AVOID - Poor value or low confidence"
 
 @app.get("/api/venues")
 async def get_all_venues():
