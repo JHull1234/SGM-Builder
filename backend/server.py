@@ -865,8 +865,200 @@ async def build_realistic_sgm(request_data: Dict):
     except Exception as e:
         return {"error": str(e)}
 
-@api_router.get("/stats/reality-check")
-async def statistics_reality_check():
+@api_router.get("/dfs/refresh")
+async def refresh_dfs_data():
+    """Refresh AFL statistics from DFS Australia"""
+    try:
+        import sys
+        sys.path.append('/app')
+        from dfs_australia_integration import dfs_integrator
+        
+        # Fetch latest data
+        csv_content = await dfs_integrator.fetch_afl_csv_data()
+        result = await dfs_integrator.process_afl_data(csv_content)
+        
+        return {
+            "status": "✅ DFS Australia data refreshed",
+            "result": result,
+            "data_quality": "Real AFL player statistics",
+            "source": "DFS Australia CSV feed"
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+@api_router.get("/dfs/player/{player_name}/probability/{stat_type}/{threshold}")
+async def get_real_player_probability(player_name: str, stat_type: str, threshold: int):
+    """Get REAL SGM probability based on DFS Australia statistics"""
+    try:
+        from dfs_australia_integration import dfs_integrator
+        
+        # Get real probability from historical data
+        probability_data = await dfs_integrator.get_player_sgm_probability(
+            player_name, stat_type, threshold
+        )
+        
+        return probability_data
+    except Exception as e:
+        return {"error": str(e)}
+
+@api_router.get("/dfs/players/top-performers")
+async def get_top_performers():
+    """Get top AFL performers based on real statistics"""
+    try:
+        import sqlite3
+        
+        conn = sqlite3.connect("/app/afl_real_stats.db")
+        
+        # Top disposal getters
+        top_disposals = conn.execute('''
+            SELECT player_name, team, avg_disposals, disposal_25_plus_rate, games_played, form_trend
+            FROM player_averages
+            WHERE games_played >= 5
+            ORDER BY avg_disposals DESC
+            LIMIT 10
+        ''').fetchall()
+        
+        # Top goal scorers
+        top_goals = conn.execute('''
+            SELECT player_name, team, avg_goals, goal_2_plus_rate, games_played, form_trend
+            FROM player_averages  
+            WHERE games_played >= 5
+            ORDER BY avg_goals DESC
+            LIMIT 10
+        ''').fetchall()
+        
+        conn.close()
+        
+        return {
+            "top_disposal_players": [
+                {
+                    "name": row[0],
+                    "team": row[1], 
+                    "avg_disposals": round(row[2], 1),
+                    "25_plus_rate": f"{row[3]*100:.1f}%",
+                    "games": row[4],
+                    "form": row[5]
+                } for row in top_disposals
+            ],
+            "top_goal_scorers": [
+                {
+                    "name": row[0],
+                    "team": row[1],
+                    "avg_goals": round(row[2], 1), 
+                    "2_plus_rate": f"{row[3]*100:.1f}%",
+                    "games": row[4],
+                    "form": row[5]
+                } for row in top_goals
+            ],
+            "data_source": "✅ Real DFS Australia statistics"
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+@api_router.post("/dfs/sgm/build")
+async def build_dfs_backed_sgm(request_data: Dict):
+    """Build SGM with REAL DFS Australia statistical backing"""
+    try:
+        from dfs_australia_integration import dfs_integrator
+        
+        player_selections = request_data.get('players', [])
+        
+        if not player_selections:
+            return {"error": "No player selections provided"}
+        
+        sgm_analysis = []
+        combined_probability = 1.0
+        
+        for selection in player_selections:
+            player_name = selection.get('name')
+            stat_type = selection.get('stat_type')
+            threshold = selection.get('threshold')
+            
+            # Get real probability from DFS data
+            prob_data = await dfs_integrator.get_player_sgm_probability(
+                player_name, stat_type, threshold
+            )
+            
+            if 'error' not in prob_data:
+                sgm_analysis.append(prob_data)
+                combined_probability *= prob_data['probability']
+            else:
+                return {"error": f"No data for {player_name} {threshold}+ {stat_type}"}
+        
+        # Calculate fair odds and value
+        implied_odds = 1 / combined_probability if combined_probability > 0 else float('inf')
+        
+        return {
+            "sgm_analysis": {
+                "selections": sgm_analysis,
+                "combined_probability": round(combined_probability, 4),
+                "implied_fair_odds": round(implied_odds, 2),
+                "recommendation": "Strong statistical backing" if combined_probability > 0.1 else "Low probability - high risk"
+            },
+            "data_quality": "✅ Real AFL statistics from DFS Australia",
+            "confidence": "HIGH - Based on actual game performance",
+            "methodology": "Historical success rates from real AFL games"
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+@api_router.get("/dfs/status")
+async def dfs_integration_status():
+    """Check DFS Australia integration status"""
+    try:
+        import sqlite3
+        import os
+        
+        db_exists = os.path.exists("/app/afl_real_stats.db")
+        
+        if db_exists:
+            conn = sqlite3.connect("/app/afl_real_stats.db")
+            
+            player_count = conn.execute("SELECT COUNT(*) FROM player_averages").fetchone()[0]
+            game_count = conn.execute("SELECT COUNT(*) FROM game_stats").fetchone()[0] 
+            probability_count = conn.execute("SELECT COUNT(*) FROM sgm_probabilities").fetchone()[0]
+            
+            # Get sample of latest data
+            latest_players = conn.execute('''
+                SELECT player_name, team, avg_disposals, avg_goals, form_trend
+                FROM player_averages
+                ORDER BY last_calculated DESC
+                LIMIT 5
+            ''').fetchall()
+            
+            conn.close()
+            
+            return {
+                "status": "✅ DFS Australia integration active",
+                "database_stats": {
+                    "players_tracked": player_count,
+                    "games_recorded": game_count,
+                    "sgm_probabilities": probability_count
+                },
+                "sample_players": [
+                    {
+                        "name": row[0],
+                        "team": row[1],
+                        "avg_disposals": round(row[2], 1),
+                        "avg_goals": round(row[3], 1),
+                        "form": row[4]
+                    } for row in latest_players
+                ],
+                "capabilities": [
+                    "Real player statistics",
+                    "Historical probability calculations", 
+                    "Form trend analysis",
+                    "Position-based modeling",
+                    "SGM probability calculation"
+                ]
+            }
+        else:
+            return {
+                "status": "⚠️ Database not initialized",
+                "action_needed": "Run /dfs/refresh to initialize data"
+            }
+    except Exception as e:
+        return {"error": str(e)}
     """Show realistic AFL statistics to calibrate expectations"""
     return {
         "reality_check": {
