@@ -406,36 +406,139 @@ async def advanced_sgm_analysis(request: AdvancedSGMRequest):
         logging.error(f"Advanced SGM analysis error: {str(e)}")
         raise HTTPException(500, f"SGM analysis failed: {str(e)}")
 
-@api_router.get("/fixtures")
-async def get_fixtures(team_id: Optional[str] = None):
-    """Get AFL fixtures from SportDevs"""
+@api_router.get("/fixtures/current")
+async def get_current_round_fixtures():
+    """Get current round AFL fixtures with live data"""
     if not ML_MODULES_AVAILABLE:
-        return {"error": "SportDevs integration not available"}
+        return {"error": "Advanced data integration not available"}
     
     try:
-        fixtures = await sportdevs_api.get_fixtures(team_id=team_id)
+        # Get current round fixtures
+        current_fixtures = await sportdevs_api.get_current_round_fixtures()
+        
+        # Also get all 2025 fixtures for context
+        all_fixtures = await sportdevs_api.get_fixtures()
         
         # Store fixtures
-        for fixture in fixtures:
+        for fixture in current_fixtures:
             fixture_doc = {
                 "match_id": fixture.get("id"),
-                "home_team": fixture.get("home_team"),
-                "away_team": fixture.get("away_team"),
+                "home_team": fixture.get("hteam"),
+                "away_team": fixture.get("ateam"),
                 "venue": fixture.get("venue"),
                 "date": fixture.get("date"),
                 "round": fixture.get("round"),
-                "season": fixture.get("season", "2025"),
+                "roundname": fixture.get("roundname"),
+                "season": "2025",
+                "complete": fixture.get("complete", 0),
                 "last_updated": datetime.utcnow()
             }
-            await db.fixtures.update_one(
+            await db.current_fixtures.update_one(
                 {"match_id": fixture_doc["match_id"]},
                 {"$set": fixture_doc},
                 upsert=True
             )
         
-        return {"fixtures": fixtures, "count": len(fixtures)}
+        return {
+            "current_round_fixtures": current_fixtures,
+            "current_round": current_fixtures[0].get("roundname") if current_fixtures else "Unknown",
+            "total_2025_games": len(all_fixtures),
+            "current_round_count": len(current_fixtures),
+            "season": "2025"
+        }
     except Exception as e:
-        logging.error(f"Fixtures API error: {str(e)}")
+        logging.error(f"Current fixtures API error: {str(e)}")
+        return {"error": str(e)}
+
+@api_router.get("/standings/live")
+async def get_live_standings():
+    """Get live 2025 AFL standings"""
+    if not ML_MODULES_AVAILABLE:
+        return {"error": "Advanced data integration not available"}
+    
+    try:
+        standings = await sportdevs_api.get_live_standings()
+        
+        # Store standings
+        for team_standing in standings:
+            standing_doc = {
+                "team": team_standing.get("team"),
+                "played": team_standing.get("played"),
+                "wins": team_standing.get("wins"),
+                "losses": team_standing.get("losses"),
+                "draws": team_standing.get("draws"),
+                "percentage": team_standing.get("percentage"),
+                "points": team_standing.get("points"),
+                "position": team_standing.get("rank"),
+                "season": "2025",
+                "last_updated": datetime.utcnow()
+            }
+            await db.live_standings.update_one(
+                {"team": standing_doc["team"]},
+                {"$set": standing_doc},
+                upsert=True
+            )
+        
+        return {
+            "standings": standings,
+            "season": "2025",
+            "last_updated": datetime.now().isoformat(),
+            "teams_count": len(standings)
+        }
+    except Exception as e:
+        logging.error(f"Live standings API error: {str(e)}")
+        return {"error": str(e)}
+
+@api_router.get("/data/status")
+async def get_data_status():
+    """Get comprehensive data status for 2025 AFL season"""
+    try:
+        # Test all data sources
+        current_fixtures = await sportdevs_api.get_current_round_fixtures()
+        all_fixtures = await sportdevs_api.get_fixtures()
+        standings = await sportdevs_api.get_live_standings()
+        teams = await sportdevs_api.get_teams()
+        
+        # Get weather for MCG as test
+        weather_data = await weather_service.get_weather_for_venue("MCG")
+        
+        # Get betting odds
+        odds_data = await odds_service.get_afl_odds()
+        
+        return {
+            "season": "2025",
+            "data_sources": {
+                "squiggle_api": {
+                    "status": "✅ Connected",
+                    "current_round_games": len(current_fixtures),
+                    "total_2025_games": len(all_fixtures),
+                    "current_round": current_fixtures[0].get("roundname") if current_fixtures else "Unknown"
+                },
+                "standings": {
+                    "status": "✅ Connected", 
+                    "teams_count": len(standings)
+                },
+                "teams": {
+                    "status": "✅ Connected" if teams else "⚠️ Using fallback",
+                    "teams_count": len(teams) if teams else 18
+                },
+                "weather_api": {
+                    "status": "✅ Connected" if "error" not in weather_data else "❌ Error",
+                    "sample_venue": "MCG",
+                    "sample_data": weather_data
+                },
+                "odds_api": {
+                    "status": "✅ Connected" if odds_data else "❌ Error",
+                    "matches_with_odds": len(odds_data)
+                },
+                "ml_models": {
+                    "status": "✅ Active" if ML_MODULES_AVAILABLE else "❌ Inactive"
+                }
+            },
+            "last_updated": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logging.error(f"Data status error: {str(e)}")
         return {"error": str(e)}
 
 @api_router.get("/injuries")
