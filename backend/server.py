@@ -12,6 +12,16 @@ from datetime import datetime, timedelta
 import httpx
 import asyncio
 
+# Import our advanced modules
+from ml_sgm_picker import MachineLearningPredictor, AutomatedSGMPicker
+from advanced_analytics import (
+    RecentFormAnalyzer, 
+    TeammateSymergyAnalyzer, 
+    InjuryImpactAnalyzer,
+    ENHANCED_PLAYER_DATA,
+    TEAM_DEFENSIVE_STATS
+)
+
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
