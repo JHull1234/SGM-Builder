@@ -34,6 +34,11 @@ WEATHERAPI_KEY = os.environ.get('WEATHERAPI_KEY')
 ODDS_API_KEY = os.environ.get('ODDS_API_KEY')
 SQUIGGLE_API_URL = os.environ.get('SQUIGGLE_API_URL')
 
+# Debug print to verify environment variables
+print(f"DEBUG: WEATHERAPI_KEY loaded: {WEATHERAPI_KEY[:10]}..." if WEATHERAPI_KEY else "None")
+print(f"DEBUG: ODDS_API_KEY loaded: {ODDS_API_KEY[:10]}..." if ODDS_API_KEY else "None")
+print(f"DEBUG: SQUIGGLE_API_URL loaded: {SQUIGGLE_API_URL}")
+
 # AFL Venues with coordinates
 AFL_VENUES = {
     "MCG": {"lat": -37.8200, "lon": 144.9834, "city": "Melbourne", "state": "VIC"},
