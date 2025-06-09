@@ -566,6 +566,157 @@ class SGMAnalytics:
         else:
             return "AVOID - Poor value or low confidence"
 
+@app.get("/api/player/{player_name}/recent-form")
+async def get_player_recent_form(player_name: str):
+    """Get player's recent form analysis"""
+    try:
+        import sys
+        sys.path.append('/app')
+        from advanced_analytics import RecentFormAnalyzer
+        
+        # Get form analysis for all stat types
+        form_analysis = {
+            "disposals": RecentFormAnalyzer.calculate_form_factor(player_name, "disposals"),
+            "goals": RecentFormAnalyzer.calculate_form_factor(player_name, "goals"),
+            "marks": RecentFormAnalyzer.calculate_form_factor(player_name, "marks"),
+            "tackles": RecentFormAnalyzer.calculate_form_factor(player_name, "tackles")
+        }
+        
+        # Overall form assessment
+        overall_trend = RecentFormAnalyzer.RECENT_FORM_DATA.get(player_name, {}).get("form_trend", "Unknown")
+        injury_concerns = RecentFormAnalyzer.RECENT_FORM_DATA.get(player_name, {}).get("injury_concerns")
+        
+        return {
+            "player": player_name,
+            "overall_trend": overall_trend,
+            "injury_concerns": injury_concerns,
+            "stat_analysis": form_analysis,
+            "recommendation": _get_form_recommendation(form_analysis, overall_trend)
+        }
+        
+    except Exception as e:
+        raise HTTPException(500, f"Recent form analysis error: {str(e)}")
+
+def _get_form_recommendation(form_analysis: Dict, overall_trend: str) -> str:
+    """Generate recommendation based on recent form"""
+    if overall_trend == "Hot":
+        return "POSITIVE - Player in excellent recent form"
+    elif overall_trend == "Cold":
+        return "CAUTION - Player struggling for form"
+    else:
+        return "NEUTRAL - Average recent form"
+
+@app.get("/api/synergy/{player1}/{player2}")
+async def get_teammate_synergy(player1: str, player2: str):
+    """Get synergy analysis between two players"""
+    try:
+        import sys
+        sys.path.append('/app')
+        from advanced_analytics import TeammateSymergyAnalyzer
+        
+        # Create mock outcomes to test synergy
+        mock_outcomes = [
+            {"player": player1, "type": "disposals"},
+            {"player": player2, "type": "goals"}
+        ]
+        
+        synergy_analysis = TeammateSymergyAnalyzer.calculate_synergy_impact(mock_outcomes)
+        
+        return {
+            "players": [player1, player2],
+            "synergy_analysis": synergy_analysis,
+            "recommendation": _get_synergy_recommendation(synergy_analysis)
+        }
+        
+    except Exception as e:
+        raise HTTPException(500, f"Synergy analysis error: {str(e)}")
+
+def _get_synergy_recommendation(synergy_analysis: Dict) -> str:
+    """Generate synergy recommendation"""
+    rating = synergy_analysis["synergy_rating"]
+    if rating in ["Excellent", "Good"]:
+        return f"POSITIVE - {rating} synergy between players"
+    elif rating == "Neutral":
+        return "NEUTRAL - No significant synergy impact"
+    else:
+        return f"NEGATIVE - {rating} synergy may hurt SGM chances"
+
+@app.get("/api/market-timing/{bet_type}")
+async def get_market_timing(bet_type: str):
+    """Get market timing strategy for bet type"""
+    try:
+        import sys
+        sys.path.append('/app')
+        from advanced_analytics import MarketMonitor
+        
+        timing_strategy = MarketMonitor.get_market_timing_strategy(bet_type)
+        
+        return {
+            "bet_type": bet_type,
+            "timing_strategy": timing_strategy,
+            "market_opening_schedule": MarketMonitor.MARKET_OPENING_TIMES
+        }
+        
+    except Exception as e:
+        raise HTTPException(500, f"Market timing analysis error: {str(e)}")
+
+@app.post("/api/odds/track-movement")
+async def track_odds_movement(request: Dict):
+    """Track odds movement for a specific bet"""
+    try:
+        import sys
+        sys.path.append('/app')
+        from advanced_analytics import MarketMonitor
+        
+        bet_type = request.get("bet_type")
+        current_odds = request.get("current_odds")
+        
+        if not bet_type or not current_odds:
+            raise HTTPException(400, "bet_type and current_odds required")
+        
+        movement_analysis = MarketMonitor.track_line_movement(bet_type, current_odds)
+        
+        return {
+            "bet_type": bet_type,
+            "current_odds": current_odds,
+            "movement_analysis": movement_analysis
+        }
+        
+    except Exception as e:
+        raise HTTPException(500, f"Odds tracking error: {str(e)}")
+
+@app.get("/api/injury-report")
+async def get_injury_report():
+    """Get comprehensive injury report for all monitored players"""
+    try:
+        import sys
+        sys.path.append('/app')
+        from advanced_analytics import InjuryImpactAnalyzer
+        
+        injury_report = {}
+        for player_name in InjuryImpactAnalyzer.INJURY_IMPACT_DATA.keys():
+            injury_data = InjuryImpactAnalyzer.get_injury_impact(player_name)
+            injury_report[player_name] = injury_data
+        
+        # Summary statistics
+        total_players = len(injury_report)
+        injured_players = len([p for p in injury_report.values() if p["impact_rating"] != "None"])
+        high_risk = len([p for p in injury_report.values() if p["impact_rating"] == "High"])
+        
+        return {
+            "injury_report": injury_report,
+            "summary": {
+                "total_monitored": total_players,
+                "players_with_concerns": injured_players,
+                "high_risk_players": high_risk,
+                "overall_status": "Concerning" if high_risk > 0 else "Manageable" if injured_players > 0 else "Healthy"
+            },
+            "last_updated": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        raise HTTPException(500, f"Injury report error: {str(e)}")
+
 @app.get("/api/venues")
 async def get_all_venues():
     """Get all AFL venues"""
