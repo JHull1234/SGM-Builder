@@ -70,9 +70,17 @@ class PlayerPerformance(BaseModel):
     predicted_tackles: float
     confidence: float
 
+# Classes for real-time monitoring
+class RealTimeOddsMonitor:
+    def __init__(self, api_key):
+        self.api_key = api_key
+
+class SteamMoveDetector:
+    def __init__(self):
+        pass
+
 # Initialize venues collection
-@app.on_event("startup")
-async def startup_event():
+async def init_venues_collection():
     venues_collection = db["afl_venues"]
     for venue_name, data in AFL_VENUES.items():
         await venues_collection.update_one(
@@ -85,6 +93,21 @@ async def startup_event():
             }},
             upsert=True
         )
+
+# Real-time monitoring instances
+odds_monitor = None
+steam_detector = None
+
+@app.on_event("startup")
+async def startup_event():
+    global odds_monitor, steam_detector
+    await init_venues_collection()
+    
+    # Initialize real-time monitoring
+    odds_monitor = RealTimeOddsMonitor(ODDS_API_KEY)
+    steam_detector = SteamMoveDetector()
+    
+    print("🚀 AFL Analytics Platform started with real-time monitoring")
 
 class AFLDataService:
     @staticmethod
