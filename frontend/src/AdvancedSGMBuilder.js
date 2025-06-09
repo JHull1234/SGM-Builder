@@ -8,6 +8,8 @@ const AdvancedSGMBuilder = () => {
   const [teams, setTeams] = useState([]);
   const [players, setPlayers] = useState([]);
   const [fixtures, setFixtures] = useState([]);
+  const [liveStandings, setLiveStandings] = useState([]);
+  const [dataStatus, setDataStatus] = useState(null);
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [targetOdds, setTargetOdds] = useState(3.0);
   const [maxPlayers, setMaxPlayers] = useState(4);
@@ -15,6 +17,42 @@ const AdvancedSGMBuilder = () => {
   const [sgmAnalysis, setSgmAnalysis] = useState(null);
   const [loading, setLoading] = useState(false);
   const [weather, setWeather] = useState(null);
+
+  // Fetch live 2025 data on component mount
+  useEffect(() => {
+    fetchDataStatus();
+    fetchCurrentFixtures();
+    fetchLiveStandings();
+  }, []);
+
+  const fetchDataStatus = async () => {
+    try {
+      const response = await axios.get(`${API}/data/status`);
+      setDataStatus(response.data);
+    } catch (error) {
+      console.error("Error fetching data status:", error);
+    }
+  };
+
+  const fetchCurrentFixtures = async () => {
+    try {
+      const response = await axios.get(`${API}/fixtures/current`);
+      setFixtures(response.data.current_round_fixtures || []);
+    } catch (error) {
+      console.error("Error fetching fixtures:", error);
+      // Fallback to demo data
+      setFixtures(demoMatches);
+    }
+  };
+
+  const fetchLiveStandings = async () => {
+    try {
+      const response = await axios.get(`${API}/standings/live`);
+      setLiveStandings(response.data.standings || []);
+    } catch (error) {
+      console.error("Error fetching standings:", error);
+    }
+  };
 
   // Advanced SGM Analysis
   const analyzeAdvancedSGM = async () => {
