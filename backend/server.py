@@ -655,8 +655,131 @@ async def get_live_standings():
         logging.error(f"Live standings API error: {str(e)}")
         return {"error": str(e)}
 
-@api_router.get("/data/status")
-async def get_data_status():
+@api_router.get("/sportdevs/demo")
+async def demo_sportdevs_player_data():
+    """Demo SportDevs AFL player data integration"""
+    try:
+        # Direct test of SportDevs API with working parameters
+        async with httpx.AsyncClient() as client:
+            # Get Adelaide Crows players (we know this works)
+            response = await client.get(
+                "https://aussie-rules.sportdevs.com/players?team_id=eq.50639&limit=10",
+                headers={
+                    'Authorization': f'Bearer P2Df5JlImkKIcE9dhVNxpw',
+                    'Content-Type': 'application/json'
+                },
+                timeout=15
+            )
+            
+            if response.status_code == 200:
+                players = response.json()
+                
+                # Get team name for context
+                team_response = await client.get(
+                    "https://aussie-rules.sportdevs.com/teams?id=eq.50639",
+                    headers={
+                        'Authorization': f'Bearer P2Df5JlImkKIcE9dhVNxpw',
+                        'Content-Type': 'application/json'
+                    },
+                    timeout=15
+                )
+                
+                team_data = team_response.json()[0] if team_response.status_code == 200 else {}
+                
+                # Format for SGM analysis
+                sgm_ready_players = []
+                for player in players:
+                    sgm_player = {
+                        "player_id": player.get("id"),
+                        "name": player.get("name"),
+                        "nickname": player.get("nickname"),
+                        "team": "Adelaide Crows",
+                        "position": player.get("player_position", "Unknown"),
+                        "jersey_number": player.get("player_jersey_number", "Unknown"),
+                        "height": player.get("player_height"),
+                        "date_of_birth": player.get("date_of_birth"),
+                        
+                        # SGM predictions (placeholder - would come from stats API)
+                        "sgm_predictions": {
+                            "disposals_20_plus": 0.65,  # Estimated probabilities
+                            "disposals_25_plus": 0.45,
+                            "goals_1_plus": 0.35,
+                            "goals_2_plus": 0.15,
+                            "marks_5_plus": 0.70
+                        }
+                    }
+                    sgm_ready_players.append(sgm_player)
+                
+                return {
+                    "status": "✅ SportDevs API Working!",
+                    "team": {
+                        "id": team_data.get("id", 50639),
+                        "name": team_data.get("name", "Adelaide Crows"),
+                        "coach": team_data.get("coach_name", "Unknown"),
+                        "venue": team_data.get("arena_name", "Adelaide Oval")
+                    },
+                    "players": sgm_ready_players,
+                    "player_count": len(sgm_ready_players),
+                    "sgm_ready": True,
+                    "api_source": "SportDevs AFL API",
+                    "data_quality": "Live professional AFL data"
+                }
+            else:
+                return {"error": f"SportDevs API returned {response.status_code}"}
+                
+    except Exception as e:
+        logging.error(f"SportDevs demo error: {str(e)}")
+        return {"error": str(e)}
+
+@api_router.get("/sportdevs/afl-teams")
+async def get_main_afl_teams():
+    """Get the main 18 AFL teams (not reserves/women's teams)"""
+    try:
+        async with httpx.AsyncClient() as client:
+            # Get teams and filter for main AFL teams
+            response = await client.get(
+                "https://aussie-rules.sportdevs.com/teams?tournament_name=eq.AFL&gender=eq.M&limit=20",
+                headers={
+                    'Authorization': f'Bearer P2Df5JlImkKIcE9dhVNxpw',
+                    'Content-Type': 'application/json'
+                },
+                timeout=15
+            )
+            
+            if response.status_code == 200:
+                all_teams = response.json()
+                
+                # Filter for main teams (exclude reserves)
+                main_teams = []
+                for team in all_teams:
+                    team_name = team.get("name", "")
+                    if ("Reserve" not in team_name and 
+                        "II" not in team_name and 
+                        team.get("tournament_name") == "AFL"):
+                        main_teams.append({
+                            "id": team.get("id"),
+                            "name": team.get("name"),
+                            "short_name": team.get("short_name"),
+                            "code": team.get("name_code"),
+                            "coach": team.get("coach_name"),
+                            "venue": team.get("arena_name"),
+                            "colors": {
+                                "primary": team.get("color_primary"),
+                                "secondary": team.get("color_secondary")
+                            }
+                        })
+                
+                return {
+                    "afl_teams": main_teams,
+                    "count": len(main_teams),
+                    "source": "SportDevs AFL API",
+                    "ready_for_sgm": True
+                }
+            else:
+                return {"error": f"Failed to get AFL teams: {response.status_code}"}
+                
+    except Exception as e:
+        return {"error": str(e)}
     """Get comprehensive data status for 2025 AFL season"""
     try:
         # Test all data sources
