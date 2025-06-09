@@ -13,14 +13,9 @@ class APISportsAFLService:
     
     def __init__(self):
         self.api_key = os.environ.get('APISPORTS_API_KEY')
-        self.base_urls = [
-            "https://api-aussie-rules.sportsdata.io",  # Possible AFL endpoint
-            "https://api.api-sports.io/afl",           # Another possible endpoint
-            "https://api-sports.io/afl",               # Alternative format
-            "https://v1.australian-football.api-sports.io"  # Version-specific endpoint
-        ]
+        self.base_url = "https://api-sports.io"
         self.headers = {
-            'x-apisports-key': self.api_key,
+            'Authorization': f'Bearer {self.api_key}',
             'Content-Type': 'application/json'
         }
         self.session = httpx.AsyncClient(timeout=30.0)
