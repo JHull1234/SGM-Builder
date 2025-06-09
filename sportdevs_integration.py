@@ -15,24 +15,25 @@ class SportDevsAFLAPI:
     
     def __init__(self):
         self.api_key = os.environ.get('SPORTDEVS_API_KEY')
-        self.base_url = os.environ.get('SPORTDEVS_BASE_URL', 'https://sportdevs.com/api')
+        self.base_url = "https://aussie-rules.sportdevs.com"  # Correct SportDevs URL
         self.headers = {
-            'Authorization': f'Bearer {self.api_key}',
-            'Content-Type': 'application/json',
+            'Accept': 'application/json',
             'User-Agent': 'AFL-SGM-Builder/1.0'
         }
+        # Note: SportDevs may not require Bearer token for public endpoints
         
     async def get_teams(self) -> List[Dict]:
-        """Get all AFL teams data"""
+        """Get all AFL teams data from SportDevs"""
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.get(
-                    f"{self.base_url}/aussie-rules/teams",
+                    f"{self.base_url}/teams",
                     headers=self.headers,
-                    timeout=10
+                    timeout=15
                 )
                 response.raise_for_status()
-                return response.json()
+                data = response.json()
+                return data if isinstance(data, list) else []
             except Exception as e:
                 logging.error(f"SportDevs teams API error: {str(e)}")
                 return []
