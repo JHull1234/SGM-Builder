@@ -349,11 +349,27 @@ async def get_current_matches():
 @api_router.get("/weather/{venue}")
 async def get_venue_weather(venue: str, date: str = None):
     """Get weather for AFL venue"""
-    weather_data = await weather_service.get_weather_for_venue(venue, date)
+    # URL decode venue name and handle variations
+    import urllib.parse
+    venue = urllib.parse.unquote(venue)
+    
+    # Handle venue name variations
+    venue_mappings = {
+        "S.C.G.": "SCG",
+        "M.C.G.": "MCG", 
+        "Sydney Showground": "ANZ Stadium",
+        "Marvel Stadium Docklands": "Marvel Stadium"
+    }
+    
+    # Map venue if needed
+    mapped_venue = venue_mappings.get(venue, venue)
+    
+    weather_data = await weather_service.get_weather_for_venue(mapped_venue, date)
     
     # Store weather data
     weather_doc = {
         "venue": venue,
+        "mapped_venue": mapped_venue,
         "date": date or datetime.now().isoformat(),
         "weather_data": weather_data,
         "created_at": datetime.utcnow()
