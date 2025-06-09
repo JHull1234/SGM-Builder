@@ -167,31 +167,167 @@ class AFLSGMBuilderAPITester(unittest.TestCase):
                 for outcome in outcomes:
                     print(f"    - {outcome.get('player', 'Unknown')}: {outcome.get('stat_type', 'Unknown')} {outcome.get('target', 'Unknown')}+")
 
-    def test_09_predict_player_performance(self):
-        """Test the player performance prediction endpoint"""
-        print("\n🔍 Testing player performance prediction endpoint...")
-        payload = {
-            "player_id": "player123",  # Example player ID
-            "match_context": {
-                "venue": "MCG",
-                "opponent_team": "Collingwood",
-                "weather": {
-                    "temperature": 18,
-                    "wind_speed": 15,
-                    "precipitation": 0
-                }
-            },
-            "stat_types": ["disposals", "goals", "marks", "tackles"]
-        }
+    def test_10_data_status_endpoint(self):
+        """Test the data status endpoint for 2025 AFL season"""
+        print("\n🔍 Testing data status endpoint...")
+        response = requests.get(f"{self.base_url}/data/status")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
         
-        response = requests.post(f"{self.base_url}/predict/player", json=payload)
+        # Check for 2025 season data
+        self.assertEqual(data.get("season"), "2025", "Season should be 2025")
         
-        if response.status_code == 200:
-            data = response.json()
-            print(f"✅ Player performance prediction test passed")
-        else:
-            print(f"⚠️ Player performance prediction endpoint returned status {response.status_code}")
-            print(f"Response: {response.text}")
+        # Check data sources
+        data_sources = data.get("data_sources", {})
+        squiggle_api = data_sources.get("squiggle_api", {})
+        
+        # Verify total games count
+        total_games = squiggle_api.get("total_2025_games")
+        self.assertEqual(total_games, 216, f"Expected 216 total games for 2025 season, got {total_games}")
+        
+        # Verify current round
+        current_round = squiggle_api.get("current_round")
+        print(f"  Current round: {current_round}")
+        self.assertIsNotNone(current_round, "Current round should not be None")
+        
+        # Check all data sources are connected
+        for source_name, source_data in data_sources.items():
+            status = source_data.get("status", "")
+            print(f"  {source_name}: {status}")
+            self.assertIn("✅", status, f"{source_name} should be connected")
+        
+        print("✅ Data status endpoint test passed")
+        print(f"  Season: {data.get('season')}")
+        print(f"  Total 2025 games: {squiggle_api.get('total_2025_games')}")
+        print(f"  Current round: {squiggle_api.get('current_round')}")
+        
+        # Check weather data
+        weather_data = data_sources.get("weather_api", {}).get("sample_data", {})
+        print(f"  Weather conditions: {weather_data.get('conditions')}")
+        print(f"  Temperature: {weather_data.get('temperature')}°C")
+        
+        # Check odds data
+        odds_data = data_sources.get("odds_api", {})
+        print(f"  Matches with odds: {odds_data.get('matches_with_odds')}")
+
+    def test_11_current_fixtures_endpoint(self):
+        """Test the current fixtures endpoint for 2025 AFL season"""
+        print("\n🔍 Testing current fixtures endpoint...")
+        response = requests.get(f"{self.base_url}/fixtures/current")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        
+        # Check for current round fixtures
+        self.assertIn("current_round_fixtures", data, "Response should include current_round_fixtures")
+        fixtures = data.get("current_round_fixtures", [])
+        self.assertTrue(len(fixtures) > 0, "Should have at least one fixture")
+        
+        # Check season info
+        self.assertEqual(data.get("season"), "2025", "Season should be 2025")
+        
+        # Check current round
+        current_round = data.get("current_round")
+        print(f"  Current round: {current_round}")
+        
+        # Check total games
+        total_games = data.get("total_2025_games")
+        self.assertEqual(total_games, 216, f"Expected 216 total games for 2025 season, got {total_games}")
+        
+        # Verify fixture details for real 2025 AFL teams and venues
+        real_teams = ["Sydney", "Hawthorn", "GWS", "Collingwood", "Brisbane Lions", 
+                      "Carlton", "Essendon", "Geelong", "Melbourne", "Richmond"]
+        real_venues = ["SCG", "Sydney Showground", "MCG", "Marvel Stadium", "Gabba", 
+                       "Adelaide Oval", "Optus Stadium", "GMHBA Stadium"]
+        
+        # Check at least one fixture has a real team and venue
+        team_found = False
+        venue_found = False
+        
+        for fixture in fixtures:
+            home_team = fixture.get("hteam", "")
+            away_team = fixture.get("ateam", "")
+            venue = fixture.get("venue", "")
+            date = fixture.get("date", "")
+            
+            print(f"  Match: {home_team} vs {away_team}")
+            print(f"  Venue: {venue}")
+            print(f"  Date: {date}")
+            
+            # Check if this is a real team
+            if home_team in real_teams or away_team in real_teams:
+                team_found = True
+            
+            # Check if this is a real venue
+            if venue in real_venues:
+                venue_found = True
+            
+            # Check if date is from 2025
+            self.assertTrue("2025" in date, f"Date should be from 2025 season, got {date}")
+            
+            # Check if completed matches have scores
+            if fixture.get("complete") == 100:
+                self.assertIn("hscore", fixture, "Completed match should have home score")
+                self.assertIn("ascore", fixture, "Completed match should have away score")
+                print(f"  Score: {fixture.get('hscore')} - {fixture.get('ascore')} (Final)")
+            
+            print("  ---")
+        
+        self.assertTrue(team_found, "At least one fixture should have a real AFL team")
+        self.assertTrue(venue_found, "At least one fixture should have a real AFL venue")
+        
+        print("✅ Current fixtures endpoint test passed")
+        print(f"  Total fixtures: {len(fixtures)}")
+        print(f"  Season: {data.get('season')}")
+
+    def test_12_live_standings_endpoint(self):
+        """Test the live standings endpoint for 2025 AFL season"""
+        print("\n🔍 Testing live standings endpoint...")
+        response = requests.get(f"{self.base_url}/standings/live")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        
+        # Check for standings data
+        self.assertIn("standings", data, "Response should include standings")
+        standings = data.get("standings", [])
+        
+        # Check season
+        self.assertEqual(data.get("season"), "2025", "Season should be 2025")
+        
+        # Check number of teams
+        self.assertEqual(len(standings), 18, f"Should have 18 AFL teams, got {len(standings)}")
+        
+        # Check for key teams
+        key_teams = ["Collingwood", "Brisbane Lions", "Sydney", "Carlton", "Melbourne"]
+        teams_found = [team for team in key_teams if any(s.get("team") == team for s in standings)]
+        
+        print(f"  Found {len(teams_found)} of {len(key_teams)} key teams")
+        for team in teams_found:
+            print(f"  ✓ Found {team}")
+        
+        # Check standings data structure
+        for team in standings[:5]:  # Check top 5 teams
+            print(f"\n  Team: {team.get('team')}")
+            print(f"  Position: {team.get('rank')}")
+            print(f"  Record: {team.get('wins')}-{team.get('losses')}-{team.get('draws')}")
+            print(f"  Percentage: {team.get('percentage')}%")
+            print(f"  Points: {team.get('points')}")
+            
+            # Verify data types and ranges
+            self.assertIsInstance(team.get("wins"), int, "Wins should be an integer")
+            self.assertIsInstance(team.get("losses"), int, "Losses should be an integer")
+            self.assertIsInstance(team.get("percentage"), (int, float), "Percentage should be numeric")
+            self.assertIsInstance(team.get("points"), int, "Points should be an integer")
+            
+            # Verify realistic values
+            self.assertGreaterEqual(team.get("percentage", 0), 0, "Percentage should be positive")
+            self.assertLessEqual(team.get("percentage", 200), 200, "Percentage should be under 200%")
+            self.assertEqual(team.get("points"), team.get("wins") * 4 + team.get("draws") * 2, 
+                            "Points should equal wins*4 + draws*2")
+        
+        print("\n✅ Live standings endpoint test passed")
+        print(f"  Total teams: {len(standings)}")
+        print(f"  Season: {data.get('season')}")
+        print(f"  Last updated: {data.get('last_updated')}")
 
 def run_tests():
     """Run all API tests"""
