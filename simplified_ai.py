@@ -362,3 +362,72 @@ class SimplifiedSGMPicker:
             return f"⚠️ MARGINAL SGM - Fair value, proceed with caution"
         else:
             return f"❌ AVOID - Poor value"
+
+class SimplifiedForumMonitor:
+    """Simplified forum monitoring for betting intelligence"""
+    
+    def __init__(self):
+        self.mock_forum_data = {
+            "sharp_plays": [
+                {
+                    "content": "Clayton Oliver 25+ disposals looks like value at 2.40. He's averaging 35 at MCG this year.",
+                    "author": "SharpBettor123",
+                    "source": "BigFooty",
+                    "confidence": 0.8,
+                    "upvotes": 15,
+                    "player_mentioned": "Clayton Oliver",
+                    "stat_mentioned": "disposals",
+                    "line_mentioned": 25
+                },
+                {
+                    "content": "Jeremy Cameron under 2.5 goals. Weather forecast shows 30+ km/h winds at GMHBA.",
+                    "author": "WeatherAnalyst",
+                    "source": "Reddit",
+                    "confidence": 0.6,
+                    "upvotes": 8,
+                    "player_mentioned": "Jeremy Cameron",
+                    "stat_mentioned": "goals",
+                    "line_mentioned": 2.5
+                },
+                {
+                    "content": "Marcus Bontempelli overs at Marvel Stadium. He dominates there - 32+ disposals likely.",
+                    "author": "VenueExpert",
+                    "source": "Punters.com",
+                    "confidence": 0.7,
+                    "upvotes": 12,
+                    "player_mentioned": "Marcus Bontempelli",
+                    "stat_mentioned": "disposals",
+                    "line_mentioned": 32
+                }
+            ],
+            "injury_intel": [
+                {
+                    "content": "Hearing Petracca might be rested this week. Ribs still bothering him.",
+                    "author": "InsiderTips",
+                    "timestamp": datetime.now() - timedelta(minutes=30),
+                    "reliability": 0.9,
+                    "player": "Christian Petracca",
+                    "severity": "Medium"
+                },
+                {
+                    "content": "Oliver cleared to play but still being monitored after seizure incident.",
+                    "author": "MedicalInsider",
+                    "timestamp": datetime.now() - timedelta(hours=2),
+                    "reliability": 0.8,
+                    "player": "Clayton Oliver",
+                    "severity": "Low"
+                }
+            ]
+        }
+    
+    async def get_forum_intelligence(self) -> Dict:
+        """Get forum intelligence for betting decisions"""
+        
+        return {
+            "sharp_plays": self.mock_forum_data["sharp_plays"],
+            "injury_intel": self.mock_forum_data["injury_intel"],
+            "consensus_plays": self._get_consensus_plays(),
+            "contrarian_opportunities": self._get_contrarian_opportunities(),
+            "sentiment_summary": self._get_sentiment_summary(),
+            "last_updated": datetime.now().isoformat()
+        }
