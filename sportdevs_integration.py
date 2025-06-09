@@ -15,14 +15,8 @@ class SportDevsAFLAPI:
     
     def __init__(self):
         self.api_key = os.environ.get('SPORTDEVS_API_KEY')
-        # Try multiple possible base URLs
-        self.possible_base_urls = [
-            "https://api.sportdevs.com/v1",
-            "https://sportdevs.com/api/v1", 
-            "https://api.sportdevs.com",
-            "https://sportdevs.com/api"
-        ]
-        self.base_url = None
+        # Use the correct SportDevs base URL from documentation
+        self.base_url = "https://aussie-rules.sportdevs.com"
         self.headers = {
             'Authorization': f'Bearer {self.api_key}',
             'Content-Type': 'application/json',
@@ -31,47 +25,25 @@ class SportDevsAFLAPI:
         }
         
     async def find_working_base_url(self):
-        """Find the correct SportDevs API base URL"""
+        """Test the SportDevs API base URL"""
         async with httpx.AsyncClient() as client:
-            for url in self.possible_base_urls:
-                try:
-                    logging.info(f"Testing SportDevs API base URL: {url}")
-                    response = await client.get(
-                        f"{url}/aussie-rules/teams",
-                        headers=self.headers,
-                        timeout=10
-                    )
-                    if response.status_code in [200, 401, 403]:  # API exists, might need auth
-                        self.base_url = url
-                        logging.info(f"✅ Found working SportDevs API: {url}")
-                        return url
-                except Exception as e:
-                    logging.debug(f"Failed {url}: {str(e)}")
-                    continue
-            
-            # If none work, try without Bearer token
-            for url in self.possible_base_urls:
-                try:
-                    headers_no_auth = {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'User-Agent': 'AFL-SGM-Builder/2.0'
-                    }
-                    response = await client.get(
-                        f"{url}/aussie-rules/teams",
-                        headers=headers_no_auth,
-                        timeout=10
-                    )
-                    if response.status_code == 200:
-                        self.base_url = url
-                        self.headers = headers_no_auth  # Use without auth
-                        logging.info(f"✅ Found working SportDevs API (no auth): {url}")
-                        return url
-                except Exception as e:
-                    continue
-            
-            logging.error("❌ Could not find working SportDevs API endpoint")
-            return None
+            try:
+                logging.info(f"Testing SportDevs API: {self.base_url}")
+                response = await client.get(
+                    f"{self.base_url}/teams",
+                    headers=self.headers,
+                    timeout=15
+                )
+                logging.info(f"SportDevs response: {response.status_code}")
+                
+                if response.status_code in [200, 401, 403]:  # API exists
+                    return self.base_url
+                    
+            except Exception as e:
+                logging.error(f"SportDevs API test failed: {str(e)}")
+                return None
+        
+        return None
         
     async def get_teams(self) -> List[Dict]:
         """Get all AFL teams data from SportDevs"""
