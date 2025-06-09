@@ -26,42 +26,52 @@ class SportDevsAPIService:
     async def get_player_season_stats(self, player_name: str, season: int = 2025) -> Dict:
         """Get complete 2025 season statistics for a player"""
         try:
-            # First, search for player to get player_id
-            player_id = await self._search_player_id(player_name)
-            if not player_id:
-                return {"error": f"Player {player_name} not found"}
-            
-            # Get season statistics
+            # Search for players by name (using actual SportDevs endpoint)
             response = await self.session.get(
-                f"{self.base_url}/players/{player_id}/stats/{season}",
-                headers=self.headers
+                f"{self.base_url}/players-statistics",
+                headers=self.headers,
+                params={
+                    "player_name": f"ilike.*{player_name}*",
+                    "season_id": f"eq.{season}",
+                    "limit": 5
+                }
             )
             
             if response.status_code != 200:
-                return {"error": f"API returned status {response.status_code}"}
+                return {"error": f"API returned status {response.status_code}: {response.text}"}
             
             data = response.json()
             
-            # Parse and structure the data
+            if not data:
+                return {"error": f"No data found for player {player_name} in {season} season"}
+            
+            # Take the first match (best match for the name)
+            player_data = data[0]
+            
             return {
                 "player_name": player_name,
-                "player_id": player_id,
+                "actual_player_name": player_data.get("player_name", "Unknown"),
+                "player_id": player_data.get("player_id"),
                 "season": season,
-                "team": data.get("team", "Unknown"),
-                "games_played": data.get("games_played", 0),
-                "season_averages": {
-                    "disposals": data.get("disposals_per_game", 0),
-                    "goals": data.get("goals_per_game", 0),
-                    "marks": data.get("marks_per_game", 0),
-                    "tackles": data.get("tackles_per_game", 0),
-                    "contested_possessions": data.get("contested_possessions_per_game", 0),
-                    "uncontested_possessions": data.get("uncontested_possessions_per_game", 0)
+                "team": player_data.get("team_name", "Unknown"),
+                "league": player_data.get("league_name", "AFL"),
+                "season_stats": {
+                    "games_played": player_data.get("matches_played", 0),
+                    "goals": player_data.get("goals", 0),
+                    "disposals": player_data.get("disposals", 0),
+                    "marks": player_data.get("marks", 0),
+                    "tackles": player_data.get("tackles", 0),
+                    "kicks": player_data.get("kicks", 0),
+                    "handballs": player_data.get("handballs", 0),
+                    "goal_accuracy": player_data.get("goal_accuracy", 0),
+                    "contested_possessions": player_data.get("contested_possessions", 0),
+                    "uncontested_possessions": player_data.get("uncontested_possessions", 0)
                 },
-                "season_totals": {
-                    "disposals": data.get("total_disposals", 0),
-                    "goals": data.get("total_goals", 0),
-                    "marks": data.get("total_marks", 0),
-                    "tackles": data.get("total_tackles", 0)
+                "averages": {
+                    "disposals_per_game": round(player_data.get("disposals", 0) / max(player_data.get("matches_played", 1), 1), 1),
+                    "goals_per_game": round(player_data.get("goals", 0) / max(player_data.get("matches_played", 1), 1), 1),
+                    "marks_per_game": round(player_data.get("marks", 0) / max(player_data.get("matches_played", 1), 1), 1),
+                    "tackles_per_game": round(player_data.get("tackles", 0) / max(player_data.get("matches_played", 1), 1), 1)
                 },
                 "data_source": "SportDevs API",
                 "last_updated": datetime.now().isoformat()
