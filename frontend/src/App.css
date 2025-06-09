@@ -479,21 +479,272 @@ body {
   animation: slideUp 0.6s ease-out;
 }
 
-/* Scrollbar Styling */
-::-webkit-scrollbar {
-  width: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb {
+/* AI SGM Picker Styles */
+.ai-picker {
   background: linear-gradient(135deg, #667eea, #764ba2);
-  border-radius: 10px;
+  color: white;
+  border-radius: 15px;
+  padding: 25px;
+  margin-bottom: 20px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(135deg, #764ba2, #667eea);
+.target-odds-input {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.target-odds-input label {
+  font-weight: bold;
+  font-size: 1.1em;
+}
+
+.target-odds-input input {
+  padding: 12px 15px;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: bold;
+  width: 120px;
+  text-align: center;
+}
+
+.ai-recommend-btn {
+  background: linear-gradient(135deg, #2ecc71, #27ae60);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 25px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.ai-recommend-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(46, 204, 113, 0.3);
+}
+
+.ai-recommend-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ai-recommendations {
+  margin-top: 20px;
+}
+
+.ai-recommendations h3 {
+  margin-bottom: 20px;
+  font-size: 1.3em;
+}
+
+.ai-rec-card {
+  background: rgba(255, 255, 255, 0.95);
+  color: #333;
+  border-radius: 15px;
+  padding: 20px;
+  margin-bottom: 15px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.rec-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.rec-title {
+  font-size: 1.2em;
+  font-weight: bold;
+}
+
+.value-badge {
+  color: white;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.9em;
+  font-weight: bold;
+}
+
+.rec-outcomes {
+  margin-bottom: 15px;
+}
+
+.outcome-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.outcome-item:last-child {
+  border-bottom: none;
+}
+
+.player-name {
+  font-weight: bold;
+  color: #667eea;
+}
+
+.stat-line {
+  font-size: 1.1em;
+  color: #333;
+}
+
+.probability {
+  font-size: 0.9em;
+  color: #666;
+}
+
+.rec-analysis {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.analysis-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.odds-value {
+  font-weight: bold;
+  color: #2ecc71;
+  font-size: 1.1em;
+}
+
+.rec-recommendation {
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  padding: 12px 15px;
+  border-radius: 10px;
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.ai-insights {
+  margin-top: 10px;
+}
+
+.insight-item {
+  background: rgba(102, 126, 234, 0.1);
+  color: #667eea;
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-bottom: 5px;
+  font-size: 0.9em;
+}
+
+/* Forum Intelligence Styles */
+.forum-intel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 20px;
+}
+
+.intel-section h3 {
+  margin-bottom: 15px;
+  color: #667eea;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.intel-card {
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  border-radius: 12px;
+  padding: 15px;
+  margin-bottom: 12px;
+  transition: all 0.3s ease;
+}
+
+.intel-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+.intel-content {
+  font-size: 1em;
+  line-height: 1.4;
+  margin-bottom: 10px;
+  color: #333;
+}
+
+.intel-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85em;
+  color: #666;
+}
+
+.injury-intel {
+  border-left: 4px solid #e74c3c;
+}
+
+.severity {
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: bold;
+  color: white;
+}
+
+.severity.high {
+  background: #e74c3c;
+}
+
+.severity.medium {
+  background: #f39c12;
+}
+
+.severity.low {
+  background: #2ecc71;
+}
+
+/* No matches message */
+.no-matches {
+  text-align: center;
+  padding: 40px 20px;
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  border-radius: 15px;
+  color: #666;
+}
+
+.no-matches p:first-child {
+  font-size: 1.2em;
+  margin-bottom: 10px;
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+  .target-odds-input {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  
+  .target-odds-input input {
+    width: 100%;
+  }
+  
+  .rec-analysis {
+    grid-template-columns: 1fr;
+  }
+  
+  .forum-intel {
+    grid-template-columns: 1fr;
+  }
+  
+  .outcome-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
 }
