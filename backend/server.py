@@ -226,6 +226,10 @@ enhanced_sgm_analyzer = EnhancedSGMAnalyzer()
 sportdevs_service = SportDevsAPIService()
 live_afl_analyzer = LiveAFLAnalyzer()
 
+# Initialize API Sports service
+api_sports_service = APISportsAFLService()
+api_sports_analyzer = APISportsAFLAnalyzer()
+
 # SGM Analysis Engine
 class SGMAnalyzer:
     def __init__(self):
