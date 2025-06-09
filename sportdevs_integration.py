@@ -24,49 +24,68 @@ class SportDevsAPIService:
             logging.warning("SPORTDEVS_API_KEY not found in environment variables")
     
     async def get_player_season_stats(self, player_name: str, season: int = 2025) -> Dict:
-        """Get player information and available data from SportDevs API"""
+        """Get player information and statistics from SportDevs Major Plan API"""
         try:
-            # Search for player by name
+            # Search for player by name using correct SportDevs endpoint
             response = await self.session.get(
                 f"{self.base_url}/players",
                 headers=self.headers,
                 params={
-                    "name": f"ilike.*{player_name}*",
+                    "name": player_name,
+                    "season": season,
                     "limit": 5
                 }
             )
             
-            if response.status_code != 200:
+            if response.status_code == 401:
+                return {"error": "Invalid API key - please upgrade to SportDevs Major Plan (€19/month)"}
+            elif response.status_code == 403:
+                return {"error": "Access denied - Major Plan required for player statistics"}
+            elif response.status_code != 200:
                 return {"error": f"API returned status {response.status_code}: {response.text}"}
             
-            players = response.json()
+            data = response.json()
             
-            if not players:
-                return {"error": f"No player found matching '{player_name}'"}
+            if not data or "players" not in data or not data["players"]:
+                return {"error": f"No player found matching '{player_name}' in {season} season"}
             
             # Take the best match
-            player = players[0]
+            player = data["players"][0]
+            stats = player.get("statistics", {})
             
-            # Try to get additional statistics if available in other endpoints
-            # Note: Full statistics may require higher subscription tier
+            # Get recent form data
+            recent_form = await self.get_player_recent_games(player_name, 5)
             
             return {
                 "player_name": player_name,
                 "actual_player_name": player.get("name", "Unknown"),
                 "player_id": player.get("id"),
-                "team": player.get("team_name", "Unknown"),
-                "position": player.get("player_position", "Unknown"),
-                "jersey_number": player.get("player_jersey_number", "Unknown"),
-                "height": player.get("player_height", 0),
-                "date_of_birth": player.get("date_of_birth", "Unknown"),
-                "data_source": "SportDevs API",
-                "api_note": "Player profile data available. Full statistics may require higher subscription tier.",
-                "subscription_info": "Current access: Basic player profiles. Upgrade for detailed statistics.",
+                "team": player.get("team", "Unknown"),
+                "position": player.get("position", "Unknown"),
+                "season": season,
+                "season_stats": {
+                    "games_played": stats.get("games_played", 0),
+                    "total_disposals": stats.get("disposals", 0),
+                    "total_goals": stats.get("goals", 0),
+                    "total_marks": stats.get("marks", 0),
+                    "total_tackles": stats.get("tackles", 0),
+                    "total_kicks": stats.get("kicks", 0),
+                    "total_handballs": stats.get("handballs", 0)
+                },
+                "averages": {
+                    "disposals_per_game": round(stats.get("disposals", 0) / max(stats.get("games_played", 1), 1), 1),
+                    "goals_per_game": round(stats.get("goals", 0) / max(stats.get("games_played", 1), 1), 1),
+                    "marks_per_game": round(stats.get("marks", 0) / max(stats.get("games_played", 1), 1), 1),
+                    "tackles_per_game": round(stats.get("tackles", 0) / max(stats.get("games_played", 1), 1), 1)
+                },
+                "recent_form": recent_form if "error" not in recent_form else None,
+                "data_source": "SportDevs API (Major Plan)",
+                "data_quality": "Professional Live AFL Data",
                 "last_updated": datetime.now().isoformat()
             }
             
         except Exception as e:
-            logging.error(f"Error fetching player data for {player_name}: {str(e)}")
+            logging.error(f"Error fetching player stats for {player_name}: {str(e)}")
             return {"error": str(e)}
     
     async def get_player_recent_games(self, player_name: str, num_games: int = 5) -> Dict:
