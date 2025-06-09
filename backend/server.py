@@ -221,6 +221,10 @@ automated_sgm_picker = AutomatedSGMPicker(ml_predictor)
 real_afl_data = RealAFLDataCollector()
 enhanced_sgm_analyzer = EnhancedSGMAnalyzer()
 
+# Initialize SportDevs live data service
+sportdevs_service = SportDevsAPIService()
+live_afl_analyzer = LiveAFLAnalyzer()
+
 # SGM Analysis Engine
 class SGMAnalyzer:
     def __init__(self):
