@@ -227,27 +227,33 @@ class SportDevsAPIService:
         """Get current round matches and live data"""
         try:
             response = await self.session.get(
-                f"{self.base_url}/matches/current/{season}",
-                headers=self.headers
+                f"{self.base_url}/matches",
+                headers=self.headers,
+                params={
+                    "season_id": f"eq.{season}",
+                    "order": "match_date.desc",
+                    "limit": 20
+                }
             )
             
             if response.status_code != 200:
-                return [{"error": f"API returned status {response.status_code}"}]
+                return [{"error": f"API returned status {response.status_code}: {response.text}"}]
             
-            matches_data = response.json().get("matches", [])
+            matches_data = response.json()
             
             formatted_matches = []
             for match in matches_data:
                 formatted_matches.append({
                     "match_id": match.get("match_id"),
-                    "home_team": match.get("home_team", "Unknown"),
-                    "away_team": match.get("away_team", "Unknown"),
-                    "venue": match.get("venue", "Unknown"),
-                    "date": match.get("date"),
-                    "round": match.get("round", 0),
-                    "status": match.get("status", "Scheduled"),  # Scheduled, Live, Completed
-                    "home_score": match.get("home_score", 0),
-                    "away_score": match.get("away_score", 0),
+                    "home_team": match.get("home_team_name", "Unknown"),
+                    "away_team": match.get("away_team_name", "Unknown"),
+                    "venue": match.get("venue_name", "Unknown"),
+                    "date": match.get("match_date"),
+                    "round": match.get("round_name", "Unknown"),
+                    "season": match.get("season_name", season),
+                    "status": match.get("status", "Unknown"),
+                    "home_score": match.get("home_team_score", 0),
+                    "away_score": match.get("away_team_score", 0),
                     "data_source": "SportDevs API",
                     "last_updated": datetime.now().isoformat()
                 })
