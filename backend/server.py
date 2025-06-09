@@ -1053,45 +1053,10 @@ async def get_forum_intelligence():
     try:
         import sys
         sys.path.append('/app')
-        from ml_sgm_picker import ForumMonitor
+        from simplified_ai import SimplifiedForumMonitor
         
-        # Mock forum intelligence for demonstration
-        forum_intel = {
-            "sharp_plays": [
-                {
-                    "content": "Clayton Oliver 25+ disposals looks like value at 2.40. He's averaging 35 at MCG this year.",
-                    "author": "SharpBettor123",
-                    "source": "BigFooty",
-                    "confidence": 0.8,
-                    "upvotes": 15
-                },
-                {
-                    "content": "Jeremy Cameron under 2.5 goals. Weather forecast shows 30+ km/h winds at GMHBA.",
-                    "author": "WeatherAnalyst",
-                    "source": "Reddit",
-                    "confidence": 0.6,
-                    "upvotes": 8
-                }
-            ],
-            "injury_intel": [
-                {
-                    "content": "Hearing Petracca might be rested this week. Ribs still bothering him.",
-                    "author": "InsiderTips",
-                    "timestamp": datetime.now() - timedelta(minutes=30),
-                    "reliability": 0.9
-                }
-            ],
-            "sentiment_analysis": {
-                "Clayton Oliver": [
-                    {"polarity": 0.6, "subjectivity": 0.3, "source": "BigFooty"},
-                    {"polarity": 0.4, "subjectivity": 0.4, "source": "Reddit"}
-                ],
-                "Jeremy Cameron": [
-                    {"polarity": -0.2, "subjectivity": 0.5, "source": "Punters.com"}
-                ]
-            },
-            "last_updated": datetime.now().isoformat()
-        }
+        forum_monitor = SimplifiedForumMonitor()
+        forum_intel = await forum_monitor.get_forum_intelligence()
         
         return forum_intel
         
