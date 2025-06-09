@@ -425,6 +425,64 @@ class SGMAnalytics:
         adjusted_value = value * confidence_adjustment
         
         return max(-1.0, min(2.0, adjusted_value))  # Cap between -100% and +200%
+    
+    @staticmethod
+    def _calculate_defensive_rank(team: str, team_defense: Dict) -> Dict:
+        """Calculate where team ranks defensively in the league"""
+        # This would use full league data in production
+        return {
+            "disposals_allowed_rank": "5th best",  # Mock ranking
+            "goals_allowed_rank": "8th best",
+            "overall_defense_rank": "6th best"
+        }
+    
+    @staticmethod
+    def _calculate_matchup_difficulty(player: Dict, team_defense: Dict) -> str:
+        """Calculate overall matchup difficulty"""
+        # Simple calculation based on team defense vs league average
+        midfielder_allowed = team_defense["midfielder_disposals_allowed"]
+        league_avg = 375.0 / 3  # Rough estimate for midfielder share
+        
+        if midfielder_allowed > league_avg * 1.1:
+            return "Favorable"
+        elif midfielder_allowed < league_avg * 0.9:
+            return "Difficult"
+        else:
+            return "Average"
+    
+    @staticmethod
+    def _project_stat_vs_defense(player_avg: float, defense_allowed: float, league_avg: float) -> float:
+        """Project player stat against specific team defense"""
+        defensive_factor = defense_allowed / league_avg
+        return round(player_avg * defensive_factor, 1)
+    
+    @staticmethod
+    def _generate_matchup_insights(player: Dict, opponent: str, team_defense: Dict) -> List[str]:
+        """Generate key insights for the matchup"""
+        insights = []
+        
+        # Defensive strength insight
+        if team_defense["midfielder_disposals_allowed"] < 115:
+            insights.append(f"{opponent} has a strong midfield defense - expect reduced disposal numbers")
+        elif team_defense["midfielder_disposals_allowed"] > 130:
+            insights.append(f"{opponent} allows high disposal counts - favorable matchup for midfielders")
+        
+        # Goal scoring insight
+        if team_defense["forward_goals_allowed"] < 7:
+            insights.append(f"{opponent} has excellent forward defense - goals will be hard to come by")
+        elif team_defense["forward_goals_allowed"] > 9:
+            insights.append(f"{opponent} defense leaks goals - good scoring opportunities expected")
+        
+        # Player-specific insight
+        if player["position"] == "Midfielder" and team_defense["tackles_per_game"] > 70:
+            insights.append(f"High tackling pressure from {opponent} may impact disposal efficiency")
+        
+        # Venue insight (if available)
+        player_venues = player.get("venue_performance", {})
+        if len(insights) < 3:
+            insights.append("Consider venue-specific performance when finalizing bet")
+        
+        return insights[:3]  # Return top 3 insights
 
 # API Endpoints
 @app.get("/")
