@@ -197,72 +197,234 @@ class BettingOddsService:
 class SGMAnalytics:
     @staticmethod
     def calculate_correlation_score(outcomes: List[Dict]) -> float:
-        """Calculate correlation between multiple outcomes in SGM"""
-        # Simplified correlation calculation
-        # In production, this would use historical data and advanced statistics
-        base_score = 0.7
+        """Calculate sophisticated correlation between multiple outcomes in SGM"""
+        import sys
+        sys.path.append('/app')
+        from enhanced_player_data import TEAM_DEFENSIVE_STATS
         
-        # Reduce correlation for outcomes from same player (less independent)
-        same_player_outcomes = {}
+        base_score = 0.8
+        
+        # Group outcomes by player and team
+        player_outcomes = {}
+        team_outcomes = {}
+        
         for outcome in outcomes:
             player = outcome.get('player')
             if player:
-                same_player_outcomes[player] = same_player_outcomes.get(player, 0) + 1
+                if player not in player_outcomes:
+                    player_outcomes[player] = []
+                player_outcomes[player].append(outcome)
+                
+                # Get player's team
+                team = SGMAnalytics._get_player_team(player)
+                if team not in team_outcomes:
+                    team_outcomes[team] = []
+                team_outcomes[team].append(outcome)
         
-        # Penalty for multiple outcomes from same player
-        for player, count in same_player_outcomes.items():
-            if count > 1:
-                base_score -= (count - 1) * 0.1
+        # 1. Same player penalty (outcomes are less independent)
+        for player, player_outs in player_outcomes.items():
+            if len(player_outs) > 1:
+                # Different penalty based on stat correlation
+                correlation_penalty = SGMAnalytics._calculate_stat_correlation_penalty(player_outs)
+                base_score -= correlation_penalty
+        
+        # 2. Teammate synergy bonus (positive correlation)
+        for team, team_outs in team_outcomes.items():
+            if len(team_outs) > 1:
+                synergy_bonus = SGMAnalytics._calculate_teammate_synergy(team_outs)
+                base_score += synergy_bonus
+        
+        # 3. Position-based correlation adjustments
+        position_adjustment = SGMAnalytics._calculate_position_correlation(outcomes)
+        base_score *= position_adjustment
         
         return max(0.1, min(1.0, base_score))
     
     @staticmethod
+    def _get_player_team(player_name: str) -> str:
+        """Get team for a player"""
+        team_mapping = {
+            "Clayton Oliver": "Melbourne",
+            "Christian Petracca": "Melbourne", 
+            "Marcus Bontempelli": "Western Bulldogs",
+            "Adam Treloar": "Western Bulldogs",
+            "Jeremy Cameron": "Geelong",
+            "Tom Hawkins": "Geelong",
+            "Patrick Cripps": "Carlton",
+            "Sam Walsh": "Carlton",
+            "Nick Daicos": "Collingwood",
+            "Scott Pendlebury": "Collingwood",
+            "Zach Merrett": "Essendon",
+            "Darcy Parish": "Essendon",
+            "Caleb Serong": "Fremantle",
+            "Andrew Brayshaw": "Fremantle",
+            "Lachie Neale": "Brisbane",
+            "Hugh McCluggage": "Brisbane",
+            "Rory Laird": "Adelaide",
+            "Jordan Dawson": "Adelaide"
+        }
+        return team_mapping.get(player_name, "Unknown")
+    
+    @staticmethod
+    def _calculate_stat_correlation_penalty(player_outcomes: List[Dict]) -> float:
+        """Calculate penalty for multiple outcomes from same player"""
+        stat_types = [outcome.get('type', '') for outcome in player_outcomes]
+        
+        # Different stats have different correlation levels
+        correlation_matrix = {
+            ('disposals', 'disposals'): 0.95,  # Very high correlation
+            ('disposals', 'marks'): 0.65,     # Positive correlation
+            ('disposals', 'goals'): -0.25,    # Slight negative correlation
+            ('disposals', 'tackles'): 0.45,   # Moderate correlation
+            ('goals', 'marks'): 0.70,         # High correlation for forwards
+            ('goals', 'tackles'): -0.15,      # Slight negative correlation
+            ('marks', 'tackles'): 0.20        # Low correlation
+        }
+        
+        total_penalty = 0
+        for i, stat1 in enumerate(stat_types):
+            for j, stat2 in enumerate(stat_types[i+1:], i+1):
+                correlation = correlation_matrix.get((stat1, stat2), 0.5)
+                correlation = correlation_matrix.get((stat2, stat1), correlation)
+                penalty = abs(correlation) * 0.2  # Convert correlation to penalty
+                total_penalty += penalty
+        
+        return total_penalty
+    
+    @staticmethod
+    def _calculate_teammate_synergy(team_outcomes: List[Dict]) -> float:
+        """Calculate synergy bonus for teammate outcomes"""
+        # Teammates often help each other achieve outcomes
+        # Example: Clayton Oliver + Christian Petracca both performing well
+        
+        if len(team_outcomes) == 2:
+            return 0.05  # Small positive correlation for teammates
+        elif len(team_outcomes) > 2:
+            return 0.03  # Diminishing returns for more teammates
+        return 0
+    
+    @staticmethod
+    def _calculate_position_correlation(outcomes: List[Dict]) -> float:
+        """Adjust correlation based on player positions"""
+        position_mapping = {
+            "Clayton Oliver": "Midfielder",
+            "Christian Petracca": "Midfielder",
+            "Marcus Bontempelli": "Midfielder", 
+            "Jeremy Cameron": "Forward",
+            "Tom Hawkins": "Forward",
+            "Patrick Cripps": "Midfielder"
+        }
+        
+        positions = []
+        for outcome in outcomes:
+            player = outcome.get('player')
+            position = position_mapping.get(player, 'Midfielder')
+            positions.append(position)
+        
+        # Same position outcomes are more correlated
+        unique_positions = len(set(positions))
+        if unique_positions == 1:
+            return 0.95  # Same position = higher correlation
+        else:
+            return 1.0   # Different positions = more independent
+    
+    @staticmethod
     def calculate_weather_impact(weather: Dict, outcomes: List[Dict]) -> Dict:
-        """Calculate how weather impacts SGM outcomes"""
+        """Calculate sophisticated weather impact on SGM outcomes"""
         impact = {
             "total_impact": 0.0,
             "wind_impact": 0.0,
             "rain_impact": 0.0,
-            "temperature_impact": 0.0
+            "temperature_impact": 0.0,
+            "detailed_breakdown": {}
         }
         
-        # Wind impact on goals and marks
-        if weather["wind_speed"] > 25:
-            for outcome in outcomes:
-                if "goals" in outcome.get("type", "").lower():
-                    impact["wind_impact"] -= 0.15
-                if "marks" in outcome.get("type", "").lower():
-                    impact["wind_impact"] -= 0.1
+        for outcome in outcomes:
+            stat_type = outcome.get("type", "").lower()
+            player = outcome.get("player", "")
+            
+            # Position-specific weather impact
+            position = SGMAnalytics._get_player_position(player)
+            
+            # Wind impact (non-linear)
+            if weather["wind_speed"] > 20:
+                if "goals" in stat_type:
+                    wind_penalty = -0.02 * (weather["wind_speed"] - 20)  # -2% per km/h above 20
+                    impact["wind_impact"] += wind_penalty
+                elif "marks" in stat_type:
+                    wind_penalty = -0.015 * (weather["wind_speed"] - 20)  # -1.5% per km/h above 20
+                    impact["wind_impact"] += wind_penalty
+                elif "disposals" in stat_type:
+                    wind_penalty = -0.008 * (weather["wind_speed"] - 20)  # -0.8% per km/h above 20
+                    impact["wind_impact"] += wind_penalty
+            
+            # Rain impact (threshold-based)
+            if weather["precipitation"] > 1:
+                rain_severity = min(weather["precipitation"] / 10, 1.0)  # Cap at 10mm
+                if "disposals" in stat_type:
+                    rain_penalty = -0.10 * rain_severity  # -10% max in heavy rain
+                    impact["rain_impact"] += rain_penalty
+                elif "marks" in stat_type:
+                    rain_penalty = -0.18 * rain_severity  # -18% max in heavy rain
+                    impact["rain_impact"] += rain_penalty
+                elif "goals" in stat_type:
+                    rain_penalty = -0.20 * rain_severity  # -20% max in heavy rain
+                    impact["rain_impact"] += rain_penalty
+            
+            # Temperature impact
+            temp = weather["temperature"]
+            if temp < 10:
+                cold_penalty = -0.015 * (10 - temp)  # -1.5% per degree below 10°C
+                impact["temperature_impact"] += cold_penalty
+            elif temp > 30:
+                hot_penalty = -0.01 * (temp - 30)  # -1% per degree above 30°C
+                impact["temperature_impact"] += hot_penalty
+            
+            # Store detailed breakdown
+            impact["detailed_breakdown"][f"{player}_{stat_type}"] = {
+                "wind_factor": 1 + (impact["wind_impact"] / len(outcomes)),
+                "rain_factor": 1 + (impact["rain_impact"] / len(outcomes)),
+                "temperature_factor": 1 + (impact["temperature_impact"] / len(outcomes))
+            }
         
-        # Rain impact on disposals and ball handling
-        if weather["precipitation"] > 1:
-            for outcome in outcomes:
-                if "disposals" in outcome.get("type", "").lower():
-                    impact["rain_impact"] -= 0.1
-        
-        # Temperature impact on endurance-based stats
-        if weather["temperature"] > 30 or weather["temperature"] < 10:
-            for outcome in outcomes:
-                if "disposals" in outcome.get("type", "").lower():
-                    impact["temperature_impact"] -= 0.05
-        
-        impact["total_impact"] = sum([
-            impact["wind_impact"],
-            impact["rain_impact"], 
-            impact["temperature_impact"]
-        ])
+        impact["total_impact"] = impact["wind_impact"] + impact["rain_impact"] + impact["temperature_impact"]
         
         return impact
     
     @staticmethod
+    def _get_player_position(player_name: str) -> str:
+        """Get position for weather impact calculations"""
+        position_mapping = {
+            "Clayton Oliver": "Midfielder",
+            "Christian Petracca": "Midfielder",
+            "Marcus Bontempelli": "Midfielder",
+            "Jeremy Cameron": "Forward",
+            "Tom Hawkins": "Forward",
+            "Patrick Cripps": "Midfielder",
+            "Sam Walsh": "Midfielder",
+            "Nick Daicos": "Midfielder",
+            "Zach Merrett": "Midfielder",
+            "Caleb Serong": "Midfielder"
+        }
+        return position_mapping.get(player_name, "Midfielder")
+    
+    @staticmethod
     def calculate_value_rating(predicted_prob: float, market_odds: float) -> float:
-        """Calculate value rating for SGM bet"""
+        """Calculate sophisticated value rating for SGM bet"""
         if market_odds <= 0:
             return 0.0
         
+        # Convert odds to implied probability (including bookmaker margin)
         implied_prob = 1 / market_odds
+        
+        # Calculate value (our edge over the market)
         value = (predicted_prob - implied_prob) / implied_prob
-        return max(-1.0, min(1.0, value))
+        
+        # Adjust for confidence in our prediction
+        confidence_adjustment = min(predicted_prob, 0.9)  # Cap confidence at 90%
+        adjusted_value = value * confidence_adjustment
+        
+        return max(-1.0, min(2.0, adjusted_value))  # Cap between -100% and +200%
 
 # API Endpoints
 @app.get("/")
