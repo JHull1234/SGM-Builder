@@ -817,6 +817,205 @@ async def get_player_analytics_dashboard(player_name: str):
         }
     }
 
+@api_router.get("/real-data/current-matches")
+async def get_real_current_matches():
+    """Get real current AFL matches from live sources"""
+    try:
+        matches = await real_afl_data.get_current_round_matches()
+        return {
+            "matches": matches,
+            "count": len(matches),
+            "source": "Multiple live sources",
+            "updated_at": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logging.error(f"Real matches error: {str(e)}")
+        raise HTTPException(500, f"Failed to fetch real matches: {str(e)}")
+
+@api_router.get("/real-data/player/{player_name}/stats")
+async def get_real_player_stats(player_name: str, team: str = None):
+    """Get real 2025 season player statistics"""
+    try:
+        stats = await real_afl_data.get_player_season_stats(player_name, team)
+        if not stats:
+            raise HTTPException(404, f"No real data found for player: {player_name}")
+        
+        return stats
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Real player stats error: {str(e)}")
+        raise HTTPException(500, f"Failed to fetch real player stats: {str(e)}")
+
+@api_router.get("/real-data/team/{team_name}/defensive-stats")
+async def get_real_team_defensive_stats(team_name: str):
+    """Get real team defensive statistics for 2025"""
+    try:
+        stats = await real_afl_data.get_team_defensive_stats(team_name)
+        if not stats:
+            raise HTTPException(404, f"No real defensive data found for team: {team_name}")
+        
+        return stats
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Real team stats error: {str(e)}")
+        raise HTTPException(500, f"Failed to fetch real team stats: {str(e)}")
+
+@api_router.get("/real-data/injuries")
+async def get_real_injury_list():
+    """Get current AFL injury list from official sources"""
+    try:
+        injuries = await real_afl_data.get_injury_list()
+        return {
+            "injuries": injuries,
+            "count": len(injuries),
+            "updated_at": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logging.error(f"Real injury data error: {str(e)}")
+        raise HTTPException(500, f"Failed to fetch real injury data: {str(e)}")
+
+@api_router.post("/sgm/real-analyze")
+async def analyze_real_sgm(combination_data: Dict):
+    """Analyze SGM using real AFL 2025 season data"""
+    try:
+        venue = combination_data.get('venue', 'MCG')
+        date = combination_data.get('date', datetime.now().isoformat())
+        selections = combination_data.get('selections', [])
+        
+        if not selections:
+            raise HTTPException(400, "No selections provided")
+        
+        # Get real weather data
+        weather_data = await weather_service.get_weather_for_venue(venue, date)
+        
+        # Analyze using real AFL data
+        real_analysis = await enhanced_sgm_analyzer.analyze_real_sgm(
+            selections=selections,
+            venue=venue,
+            date=date
+        )
+        
+        # Combine with weather data
+        result = {
+            "match_info": {
+                "venue": venue,
+                "date": date,
+                "analysis_type": "Real AFL Data Analysis"
+            },
+            "weather_conditions": weather_data,
+            "real_sgm_analysis": real_analysis,
+            "data_sources": {
+                "player_stats": "Live AFL Tables/Footywire",
+                "weather": "WeatherAPI",
+                "analysis": "Enhanced SGM Analyzer"
+            }
+        }
+        
+        # Store analysis
+        analysis_doc = {
+            "venue": venue,
+            "date": date,
+            "selections": selections,
+            "weather_data": weather_data,
+            "real_analysis": real_analysis,
+            "analysis_type": "real_data",
+            "created_at": datetime.utcnow()
+        }
+        await db.real_sgm_analysis.insert_one(analysis_doc)
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Real SGM analysis error: {str(e)}")
+        raise HTTPException(500, f"Real SGM analysis failed: {str(e)}")
+
+@api_router.get("/demo/collingwood-melbourne-sgm")
+async def demo_collingwood_melbourne_sgm():
+    """Demo SGM for Collingwood vs Melbourne using real data"""
+    try:
+        # Get real player data for key players
+        clayton_stats = await real_afl_data.get_player_season_stats("Clayton Oliver", "Melbourne")
+        daicos_stats = await real_afl_data.get_player_season_stats("Nick Daicos", "Collingwood")
+        petracca_stats = await real_afl_data.get_player_season_stats("Christian Petracca", "Melbourne")
+        
+        # Weather for MCG
+        weather_data = await weather_service.get_weather_for_venue("MCG")
+        
+        # Demo SGM selections based on real form
+        demo_selections = []
+        
+        if clayton_stats and "recent_form" in clayton_stats:
+            recent_disposals = clayton_stats["recent_form"]["disposals"]
+            # Set threshold based on recent form
+            threshold = max(20, int(recent_disposals * 0.8))  # Conservative threshold
+            demo_selections.append({
+                "player": "Clayton Oliver",
+                "stat_type": "disposals", 
+                "threshold": threshold,
+                "reasoning": f"Recent form: {recent_disposals} avg, setting conservative threshold"
+            })
+        
+        if daicos_stats and "recent_form" in daicos_stats:
+            recent_disposals = daicos_stats["recent_form"]["disposals"]
+            threshold = max(18, int(recent_disposals * 0.75))
+            demo_selections.append({
+                "player": "Nick Daicos",
+                "stat_type": "disposals",
+                "threshold": threshold,
+                "reasoning": f"Recent form: {recent_disposals} avg, conservative threshold"
+            })
+        
+        # Analyze the demo SGM
+        if demo_selections:
+            real_analysis = await enhanced_sgm_analyzer.analyze_real_sgm(
+                selections=demo_selections,
+                venue="MCG",
+                date="2025-06-09"
+            )
+            
+            return {
+                "demo_title": "🏈 Collingwood vs Melbourne - Real Data SGM",
+                "match_info": {
+                    "teams": "Collingwood vs Melbourne",
+                    "venue": "MCG",
+                    "date": "2025-06-09"
+                },
+                "real_player_data": {
+                    "clayton_oliver": clayton_stats,
+                    "nick_daicos": daicos_stats,
+                    "christian_petracca": petracca_stats
+                },
+                "weather_conditions": weather_data,
+                "demo_sgm": demo_selections,
+                "real_analysis": real_analysis,
+                "data_quality": {
+                    "clayton_data": "Available" if clayton_stats else "Not Available",
+                    "daicos_data": "Available" if daicos_stats else "Not Available",
+                    "petracca_data": "Available" if petracca_stats else "Not Available"
+                },
+                "note": "This analysis uses real AFL data where available, falling back to statistical models otherwise"
+            }
+        else:
+            return {
+                "demo_title": "🏈 Collingwood vs Melbourne - Data Collection Demo",
+                "message": "Real data collection in progress",
+                "available_data": {
+                    "clayton_oliver": clayton_stats,
+                    "nick_daicos": daicos_stats,
+                    "christian_petracca": petracca_stats
+                },
+                "weather_conditions": weather_data,
+                "note": "Player data may be limited due to website access restrictions"
+            }
+        
+    except Exception as e:
+        logging.error(f"Demo SGM error: {str(e)}")
+        raise HTTPException(500, f"Demo SGM failed: {str(e)}")
+
 import statistics
 
 # Include the router in the main app
