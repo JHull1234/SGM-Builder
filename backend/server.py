@@ -127,66 +127,14 @@ class AFLDataService:
 
     @staticmethod
     async def get_player_stats():
-        """Get player statistics - simulated for now since Squiggle has limited player data"""
-        # This would integrate with more detailed player APIs in production
-        sample_players = [
-            {
-                "id": str(uuid.uuid4()),
-                "name": "Clayton Oliver",
-                "team": "Melbourne",
-                "position": "Midfielder",
-                "avg_disposals": 32.5,
-                "avg_goals": 0.8,
-                "avg_marks": 4.2,
-                "avg_tackles": 6.8,
-                "games_played": 20
-            },
-            {
-                "id": str(uuid.uuid4()),
-                "name": "Christian Petracca", 
-                "team": "Melbourne",
-                "position": "Midfielder",
-                "avg_disposals": 28.3,
-                "avg_goals": 1.2,
-                "avg_marks": 5.1,
-                "avg_tackles": 4.9,
-                "games_played": 18
-            },
-            {
-                "id": str(uuid.uuid4()),
-                "name": "Marcus Bontempelli",
-                "team": "Western Bulldogs", 
-                "position": "Midfielder",
-                "avg_disposals": 29.7,
-                "avg_goals": 1.1,
-                "avg_marks": 6.3,
-                "avg_tackles": 5.2,
-                "games_played": 22
-            },
-            {
-                "id": str(uuid.uuid4()),
-                "name": "Jeremy Cameron",
-                "team": "Geelong",
-                "position": "Forward",
-                "avg_disposals": 12.4,
-                "avg_goals": 2.8,
-                "avg_marks": 7.9,
-                "avg_tackles": 2.1,
-                "games_played": 21
-            },
-            {
-                "id": str(uuid.uuid4()),
-                "name": "Tom Hawkins",
-                "team": "Geelong", 
-                "position": "Forward",
-                "avg_disposals": 10.2,
-                "avg_goals": 2.3,
-                "avg_marks": 8.5,
-                "avg_tackles": 1.8,
-                "games_played": 19
-            }
-        ]
-        return sample_players
+        """Get comprehensive player statistics for SGM analysis"""
+        # Import enhanced player data
+        import sys
+        import os
+        sys.path.append('/app')
+        from enhanced_player_data import COMPREHENSIVE_AFL_PLAYERS, TEAM_DEFENSIVE_STATS
+        
+        return COMPREHENSIVE_AFL_PLAYERS
 
 class WeatherService:
     @staticmethod
