@@ -84,53 +84,71 @@ class SportDevsAPIService:
     async def get_player_recent_games(self, player_name: str, num_games: int = 5) -> Dict:
         """Get last N games for a player with detailed stats"""
         try:
-            player_id = await self._search_player_id(player_name)
-            if not player_id:
-                return {"error": f"Player {player_name} not found"}
-            
+            # Get matches-players-statistics for recent games
             response = await self.session.get(
-                f"{self.base_url}/players/{player_id}/games/recent",
+                f"{self.base_url}/matches-players-statistics",
                 headers=self.headers,
-                params={"limit": num_games}
+                params={
+                    "player_name": f"ilike.*{player_name}*",
+                    "order": "match_date.desc",
+                    "limit": num_games
+                }
             )
             
             if response.status_code != 200:
-                return {"error": f"API returned status {response.status_code}"}
+                return {"error": f"API returned status {response.status_code}: {response.text}"}
             
-            games_data = response.json().get("games", [])
+            games_data = response.json()
+            
+            if not games_data:
+                return {"error": f"No recent games found for {player_name}"}
             
             # Calculate recent form averages
-            if games_data:
-                recent_stats = {
-                    "disposals": [game.get("disposals", 0) for game in games_data],
-                    "goals": [game.get("goals", 0) for game in games_data],
-                    "marks": [game.get("marks", 0) for game in games_data],
-                    "tackles": [game.get("tackles", 0) for game in games_data]
-                }
-                
-                recent_averages = {
-                    "disposals": sum(recent_stats["disposals"]) / len(games_data),
-                    "goals": sum(recent_stats["goals"]) / len(games_data),
-                    "marks": sum(recent_stats["marks"]) / len(games_data),
-                    "tackles": sum(recent_stats["tackles"]) / len(games_data)
-                }
-                
-                return {
-                    "player_name": player_name,
-                    "player_id": player_id,
-                    "games_analyzed": len(games_data),
-                    "recent_games": games_data,
-                    "recent_averages": recent_averages,
-                    "recent_stats_lists": recent_stats,
-                    "data_source": "SportDevs API",
-                    "last_updated": datetime.now().isoformat()
-                }
-            else:
-                return {"error": "No recent games data available"}
+            recent_stats = {
+                "disposals": [game.get("disposals", 0) for game in games_data],
+                "goals": [game.get("goals", 0) for game in games_data],
+                "marks": [game.get("marks", 0) for game in games_data],
+                "tackles": [game.get("tackles", 0) for game in games_data]
+            }
+            
+            recent_averages = {
+                "disposals": round(sum(recent_stats["disposals"]) / len(games_data), 1),
+                "goals": round(sum(recent_stats["goals"]) / len(games_data), 1),
+                "marks": round(sum(recent_stats["marks"]) / len(games_data), 1),
+                "tackles": round(sum(recent_stats["tackles"]) / len(games_data), 1)
+            }
+            
+            return {
+                "player_name": player_name,
+                "actual_player_name": games_data[0].get("player_name", "Unknown"),
+                "games_analyzed": len(games_data),
+                "recent_games": games_data,
+                "recent_averages": recent_averages,
+                "recent_stats_lists": recent_stats,
+                "form_trend": self._calculate_form_trend(recent_stats["disposals"]),
+                "data_source": "SportDevs API",
+                "last_updated": datetime.now().isoformat()
+            }
                 
         except Exception as e:
             logging.error(f"Error fetching recent games for {player_name}: {str(e)}")
             return {"error": str(e)}
+    
+    def _calculate_form_trend(self, recent_values: List[float]) -> str:
+        """Calculate if player is improving, declining, or stable"""
+        if len(recent_values) < 3:
+            return "insufficient_data"
+        
+        # Compare recent 2 games vs older games
+        recent_avg = sum(recent_values[:2]) / 2
+        older_avg = sum(recent_values[2:]) / len(recent_values[2:])
+        
+        if recent_avg > older_avg * 1.15:
+            return "improving"
+        elif recent_avg < older_avg * 0.85:
+            return "declining"
+        else:
+            return "stable"
     
     async def get_team_defensive_stats(self, team_name: str, season: int = 2025) -> Dict:
         """Get team defensive statistics for 2025 season"""
