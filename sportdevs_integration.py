@@ -1,441 +1,388 @@
-# SportDevs AFL API Integration - Live 2025 Season Data
-# Professional AFL statistics for real SGM analysis
+"""
+SportDevs AFL API Integration
+Professional grade AFL data integration for SGM betting analysis
+"""
 
-import httpx
-import asyncio
-from typing import Dict, List, Optional
-import logging
-from datetime import datetime, timedelta
 import os
+import asyncio
+import httpx
+from typing import Dict, List, Optional
+from datetime import datetime, timedelta
+import logging
 
-class SportDevsAPIService:
-    """Professional AFL data integration with SportDevs API"""
+class SportDevsAFLAPI:
+    """Professional AFL data provider via SportDevs API"""
     
     def __init__(self):
         self.api_key = os.environ.get('SPORTDEVS_API_KEY')
-        self.base_url = "https://aussie-rules.sportdevs.com"
+        self.base_url = os.environ.get('SPORTDEVS_BASE_URL', 'https://sportdevs.com/api')
         self.headers = {
             'Authorization': f'Bearer {self.api_key}',
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'User-Agent': 'AFL-SGM-Builder/1.0'
         }
-        self.session = httpx.AsyncClient(timeout=30.0)
         
-        if not self.api_key:
-            logging.warning("SPORTDEVS_API_KEY not found in environment variables")
+    async def get_teams(self) -> List[Dict]:
+        """Get all AFL teams data"""
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(
+                    f"{self.base_url}/aussie-rules/teams",
+                    headers=self.headers,
+                    timeout=10
+                )
+                response.raise_for_status()
+                return response.json()
+            except Exception as e:
+                logging.error(f"SportDevs teams API error: {str(e)}")
+                return []
     
-    async def get_player_season_stats(self, player_name: str, season: int = 2025) -> Dict:
-        """Get player information and statistics from SportDevs Major Plan API"""
-        try:
-            # Search for player by name using correct SportDevs endpoint
-            response = await self.session.get(
-                f"{self.base_url}/players",
-                headers=self.headers,
-                params={
-                    "name": player_name,
-                    "season": season,
-                    "limit": 5
-                }
-            )
-            
-            if response.status_code == 401:
-                return {"error": "Invalid API key - please upgrade to SportDevs Major Plan (€19/month)"}
-            elif response.status_code == 403:
-                return {"error": "Access denied - Major Plan required for player statistics"}
-            elif response.status_code != 200:
-                return {"error": f"API returned status {response.status_code}: {response.text}"}
-            
-            data = response.json()
-            
-            if not data or "players" not in data or not data["players"]:
-                return {"error": f"No player found matching '{player_name}' in {season} season"}
-            
-            # Take the best match
-            player = data["players"][0]
-            stats = player.get("statistics", {})
-            
-            # Get recent form data
-            recent_form = await self.get_player_recent_games(player_name, 5)
-            
-            return {
-                "player_name": player_name,
-                "actual_player_name": player.get("name", "Unknown"),
-                "player_id": player.get("id"),
-                "team": player.get("team", "Unknown"),
-                "position": player.get("position", "Unknown"),
-                "season": season,
-                "season_stats": {
-                    "games_played": stats.get("games_played", 0),
-                    "total_disposals": stats.get("disposals", 0),
-                    "total_goals": stats.get("goals", 0),
-                    "total_marks": stats.get("marks", 0),
-                    "total_tackles": stats.get("tackles", 0),
-                    "total_kicks": stats.get("kicks", 0),
-                    "total_handballs": stats.get("handballs", 0)
-                },
-                "averages": {
-                    "disposals_per_game": round(stats.get("disposals", 0) / max(stats.get("games_played", 1), 1), 1),
-                    "goals_per_game": round(stats.get("goals", 0) / max(stats.get("games_played", 1), 1), 1),
-                    "marks_per_game": round(stats.get("marks", 0) / max(stats.get("games_played", 1), 1), 1),
-                    "tackles_per_game": round(stats.get("tackles", 0) / max(stats.get("games_played", 1), 1), 1)
-                },
-                "recent_form": recent_form if "error" not in recent_form else None,
-                "data_source": "SportDevs API (Major Plan)",
-                "data_quality": "Professional Live AFL Data",
-                "last_updated": datetime.now().isoformat()
-            }
-            
-        except Exception as e:
-            logging.error(f"Error fetching player stats for {player_name}: {str(e)}")
-            return {"error": str(e)}
+    async def get_team_statistics(self, team_id: str, season: str = "2025") -> Dict:
+        """Get detailed team statistics"""
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(
+                    f"{self.base_url}/aussie-rules/teams/{team_id}/statistics",
+                    headers=self.headers,
+                    params={"season": season},
+                    timeout=10
+                )
+                response.raise_for_status()
+                return response.json()
+            except Exception as e:
+                logging.error(f"SportDevs team stats error: {str(e)}")
+                return {}
     
-    async def get_player_recent_games(self, player_name: str, num_games: int = 5) -> Dict:
-        """Get last N games for a player with detailed stats"""
-        try:
-            # Get matches-players-statistics for recent games
-            response = await self.session.get(
-                f"{self.base_url}/matches-players-statistics",
-                headers=self.headers,
-                params={
-                    "player_name": f"ilike.*{player_name}*",
-                    "order": "match_date.desc",
-                    "limit": num_games
-                }
-            )
-            
-            if response.status_code != 200:
-                return {"error": f"API returned status {response.status_code}: {response.text}"}
-            
-            games_data = response.json()
-            
-            if not games_data:
-                return {"error": f"No recent games found for {player_name}"}
-            
-            # Calculate recent form averages
-            recent_stats = {
-                "disposals": [game.get("disposals", 0) for game in games_data],
-                "goals": [game.get("goals", 0) for game in games_data],
-                "marks": [game.get("marks", 0) for game in games_data],
-                "tackles": [game.get("tackles", 0) for game in games_data]
-            }
-            
-            recent_averages = {
-                "disposals": round(sum(recent_stats["disposals"]) / len(games_data), 1),
-                "goals": round(sum(recent_stats["goals"]) / len(games_data), 1),
-                "marks": round(sum(recent_stats["marks"]) / len(games_data), 1),
-                "tackles": round(sum(recent_stats["tackles"]) / len(games_data), 1)
-            }
-            
-            return {
-                "player_name": player_name,
-                "actual_player_name": games_data[0].get("player_name", "Unknown"),
-                "games_analyzed": len(games_data),
-                "recent_games": games_data,
-                "recent_averages": recent_averages,
-                "recent_stats_lists": recent_stats,
-                "form_trend": self._calculate_form_trend(recent_stats["disposals"]),
-                "data_source": "SportDevs API",
-                "last_updated": datetime.now().isoformat()
-            }
-                
-        except Exception as e:
-            logging.error(f"Error fetching recent games for {player_name}: {str(e)}")
-            return {"error": str(e)}
+    async def get_players(self, team_id: Optional[str] = None) -> List[Dict]:
+        """Get player data, optionally filtered by team"""
+        async with httpx.AsyncClient() as client:
+            try:
+                params = {}
+                if team_id:
+                    params['team_id'] = team_id
+                    
+                response = await client.get(
+                    f"{self.base_url}/aussie-rules/players",
+                    headers=self.headers,
+                    params=params,
+                    timeout=15
+                )
+                response.raise_for_status()
+                return response.json()
+            except Exception as e:
+                logging.error(f"SportDevs players API error: {str(e)}")
+                return []
     
-    def _calculate_form_trend(self, recent_values: List[float]) -> str:
-        """Calculate if player is improving, declining, or stable"""
-        if len(recent_values) < 3:
-            return "insufficient_data"
-        
-        # Compare recent 2 games vs older games
-        recent_avg = sum(recent_values[:2]) / 2
-        older_avg = sum(recent_values[2:]) / len(recent_values[2:])
-        
-        if recent_avg > older_avg * 1.15:
-            return "improving"
-        elif recent_avg < older_avg * 0.85:
-            return "declining"
-        else:
-            return "stable"
+    async def get_player_statistics(self, player_id: str, season: str = "2025") -> Dict:
+        """Get comprehensive player statistics"""
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(
+                    f"{self.base_url}/aussie-rules/players/{player_id}/statistics",
+                    headers=self.headers,
+                    params={"season": season},
+                    timeout=10
+                )
+                response.raise_for_status()
+                return response.json()
+            except Exception as e:
+                logging.error(f"SportDevs player stats error: {str(e)}")
+                return {}
     
-    async def get_team_defensive_stats(self, team_name: str, season: int = 2025) -> Dict:
-        """Get team defensive statistics for 2025 season"""
-        try:
-            team_id = await self._search_team_id(team_name)
-            if not team_id:
-                return {"error": f"Team {team_name} not found"}
-            
-            response = await self.session.get(
-                f"{self.base_url}/teams/{team_id}/stats/defensive/{season}",
-                headers=self.headers
-            )
-            
-            if response.status_code != 200:
-                return {"error": f"API returned status {response.status_code}"}
-            
-            data = response.json()
-            
-            return {
-                "team_name": team_name,
-                "team_id": team_id,
-                "season": season,
-                "defensive_stats": {
-                    "points_against_per_game": data.get("points_against_per_game", 0),
-                    "disposals_allowed_per_game": data.get("disposals_allowed_per_game", 0),
-                    "tackles_per_game": data.get("tackles_per_game", 0),
-                    "intercepts_per_game": data.get("intercepts_per_game", 0),
-                    "pressure_acts_per_game": data.get("pressure_acts_per_game", 0),
-                    "defensive_efficiency": data.get("defensive_efficiency", 0)
-                },
-                "ranking": {
-                    "defensive_rank": data.get("defensive_rank", 0),
-                    "total_teams": 18
-                },
-                "data_source": "SportDevs API",
-                "last_updated": datetime.now().isoformat()
-            }
-            
-        except Exception as e:
-            logging.error(f"Error fetching team defensive stats for {team_name}: {str(e)}")
-            return {"error": str(e)}
+    async def get_fixtures(self, season: str = "2025", team_id: Optional[str] = None) -> List[Dict]:
+        """Get match fixtures"""
+        async with httpx.AsyncClient() as client:
+            try:
+                params = {"season": season}
+                if team_id:
+                    params['team_id'] = team_id
+                    
+                response = await client.get(
+                    f"{self.base_url}/aussie-rules/fixtures",
+                    headers=self.headers,
+                    params=params,
+                    timeout=10
+                )
+                response.raise_for_status()
+                return response.json()
+            except Exception as e:
+                logging.error(f"SportDevs fixtures error: {str(e)}")
+                return []
     
-    async def get_injury_reports(self, season: int = 2025) -> List[Dict]:
-        """Get current injury reports across the league"""
-        try:
-            response = await self.session.get(
-                f"{self.base_url}/injuries/current/{season}",
-                headers=self.headers
-            )
-            
-            if response.status_code != 200:
-                return [{"error": f"API returned status {response.status_code}"}]
-            
-            injuries_data = response.json().get("injuries", [])
-            
-            formatted_injuries = []
-            for injury in injuries_data:
-                formatted_injuries.append({
-                    "player_name": injury.get("player_name", "Unknown"),
-                    "team": injury.get("team", "Unknown"),
-                    "injury_type": injury.get("injury_type", "Unknown"),
-                    "status": injury.get("status", "Unknown"),  # injured, test, available
-                    "expected_return": injury.get("expected_return"),
-                    "weeks_out": injury.get("weeks_out", 0),
-                    "data_source": "SportDevs API",
-                    "last_updated": datetime.now().isoformat()
-                })
-            
-            return formatted_injuries
-            
-        except Exception as e:
-            logging.error(f"Error fetching injury reports: {str(e)}")
-            return [{"error": str(e)}]
+    async def get_match_statistics(self, match_id: str) -> Dict:
+        """Get detailed match statistics"""
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(
+                    f"{self.base_url}/aussie-rules/matches/{match_id}/statistics",
+                    headers=self.headers,
+                    timeout=10
+                )
+                response.raise_for_status()
+                return response.json()
+            except Exception as e:
+                logging.error(f"SportDevs match stats error: {str(e)}")
+                return {}
     
-    async def get_live_match_data(self, season: int = 2025) -> List[Dict]:
-        """Get current round matches and live data"""
-        try:
-            response = await self.session.get(
-                f"{self.base_url}/matches",
-                headers=self.headers,
-                params={
-                    "season_id": f"eq.{season}",
-                    "order": "match_date.desc",
-                    "limit": 20
-                }
-            )
-            
-            if response.status_code != 200:
-                return [{"error": f"API returned status {response.status_code}: {response.text}"}]
-            
-            matches_data = response.json()
-            
-            formatted_matches = []
-            for match in matches_data:
-                formatted_matches.append({
-                    "match_id": match.get("match_id"),
-                    "home_team": match.get("home_team_name", "Unknown"),
-                    "away_team": match.get("away_team_name", "Unknown"),
-                    "venue": match.get("venue_name", "Unknown"),
-                    "date": match.get("match_date"),
-                    "round": match.get("round_name", "Unknown"),
-                    "season": match.get("season_name", season),
-                    "status": match.get("status", "Unknown"),
-                    "home_score": match.get("home_team_score", 0),
-                    "away_score": match.get("away_team_score", 0),
-                    "data_source": "SportDevs API",
-                    "last_updated": datetime.now().isoformat()
-                })
-            
-            return formatted_matches
-            
-        except Exception as e:
-            logging.error(f"Error fetching live match data: {str(e)}")
-            return [{"error": str(e)}]
+    async def get_player_recent_form(self, player_id: str, games_count: int = 5) -> List[Dict]:
+        """Get player's recent game statistics"""
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(
+                    f"{self.base_url}/aussie-rules/players/{player_id}/recent-matches",
+                    headers=self.headers,
+                    params={"limit": games_count},
+                    timeout=10
+                )
+                response.raise_for_status()
+                return response.json()
+            except Exception as e:
+                logging.error(f"SportDevs recent form error: {str(e)}")
+                return []
     
-    async def _search_player_id(self, player_name: str) -> Optional[int]:
-        """Search for player ID by name"""
-        try:
-            response = await self.session.get(
-                f"{self.base_url}/players/search",
-                headers=self.headers,
-                params={"name": player_name}
-            )
-            
-            if response.status_code == 200:
-                search_results = response.json().get("players", [])
-                if search_results:
-                    # Return the first match (could be improved with fuzzy matching)
-                    return search_results[0].get("player_id")
-            
-            return None
-            
-        except Exception as e:
-            logging.error(f"Error searching for player {player_name}: {str(e)}")
-            return None
+    async def get_head_to_head(self, team1_id: str, team2_id: str, limit: int = 10) -> List[Dict]:
+        """Get head-to-head match history between teams"""
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(
+                    f"{self.base_url}/aussie-rules/head-to-head",
+                    headers=self.headers,
+                    params={
+                        "team1_id": team1_id,
+                        "team2_id": team2_id,
+                        "limit": limit
+                    },
+                    timeout=10
+                )
+                response.raise_for_status()
+                return response.json()
+            except Exception as e:
+                logging.error(f"SportDevs H2H error: {str(e)}")
+                return []
     
-    async def _search_team_id(self, team_name: str) -> Optional[int]:
-        """Search for team ID by name"""
-        try:
-            response = await self.session.get(
-                f"{self.base_url}/teams/search",
-                headers=self.headers,
-                params={"name": team_name}
-            )
-            
-            if response.status_code == 200:
-                search_results = response.json().get("teams", [])
-                if search_results:
-                    return search_results[0].get("team_id")
-            
-            return None
-            
-        except Exception as e:
-            logging.error(f"Error searching for team {team_name}: {str(e)}")
-            return None
+    async def get_injuries(self, team_id: Optional[str] = None) -> List[Dict]:
+        """Get current injury list"""
+        async with httpx.AsyncClient() as client:
+            try:
+                params = {}
+                if team_id:
+                    params['team_id'] = team_id
+                    
+                response = await client.get(
+                    f"{self.base_url}/aussie-rules/injuries",
+                    headers=self.headers,
+                    params=params,
+                    timeout=10
+                )
+                response.raise_for_status()
+                return response.json()
+            except Exception as e:
+                logging.error(f"SportDevs injuries error: {str(e)}")
+                return []
     
-    async def close(self):
-        """Close the HTTP session"""
-        await self.session.aclose()
+    async def get_standings(self, season: str = "2025") -> List[Dict]:
+        """Get current league standings"""
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(
+                    f"{self.base_url}/aussie-rules/standings",
+                    headers=self.headers,
+                    params={"season": season},
+                    timeout=10
+                )
+                response.raise_for_status()
+                return response.json()
+            except Exception as e:
+                logging.error(f"SportDevs standings error: {str(e)}")
+                return []
 
-class LiveAFLAnalyzer:
-    """Advanced SGM analysis using live AFL data from SportDevs"""
+class AFLDataProcessor:
+    """Process and normalize AFL data from SportDevs for SGM analysis"""
     
-    def __init__(self):
-        self.sportdevs = SportDevsAPIService()
+    def __init__(self, sportdevs_api: SportDevsAFLAPI):
+        self.api = sportdevs_api
     
-    async def analyze_live_sgm(self, selections: List[Dict], venue: str = "MCG") -> Dict:
-        """Analyze SGM using live 2025 AFL data"""
+    async def get_enhanced_player_data(self, player_id: str) -> Dict:
+        """Get comprehensive enhanced player data for ML models"""
         try:
-            enhanced_predictions = []
+            # Get basic player stats
+            player_stats = await self.api.get_player_statistics(player_id)
             
-            for selection in selections:
-                player_name = selection["player"]
-                stat_type = selection["stat_type"]
-                threshold = selection["threshold"]
+            # Get recent form
+            recent_form = await self.api.get_player_recent_form(player_id)
+            
+            # Process and enhance data
+            enhanced_data = {
+                "player_id": player_id,
+                "name": player_stats.get("name", "Unknown"),
+                "team": player_stats.get("team", "Unknown"),
+                "position": player_stats.get("position", "Unknown"),
                 
-                # Get live player data
-                season_stats = await self.sportdevs.get_player_season_stats(player_name)
-                recent_games = await self.sportdevs.get_player_recent_games(player_name, 5)
+                # Season averages
+                "avg_disposals": player_stats.get("avg_disposals", 0),
+                "avg_goals": player_stats.get("avg_goals", 0),
+                "avg_marks": player_stats.get("avg_marks", 0),
+                "avg_tackles": player_stats.get("avg_tackles", 0),
+                "avg_kicks": player_stats.get("avg_kicks", 0),
+                "avg_handballs": player_stats.get("avg_handballs", 0),
+                "games_played": player_stats.get("games_played", 0),
                 
-                if "error" not in season_stats and "error" not in recent_games:
-                    # Calculate probability using real data
-                    season_avg = season_stats["season_averages"].get(stat_type, 0)
-                    recent_avg = recent_games["recent_averages"].get(stat_type, season_avg)
-                    
-                    # Use normal distribution for probability calculation
-                    import numpy as np
-                    from scipy import stats
-                    
-                    # Adjust for recent form vs season form
-                    form_factor = recent_avg / season_avg if season_avg > 0 else 1.0
-                    adjusted_avg = recent_avg if form_factor > 0.8 else (recent_avg + season_avg) / 2
-                    
-                    # Estimate standard deviation based on recent games variability
-                    recent_values = recent_games["recent_stats_lists"].get(stat_type, [])
-                    if len(recent_values) > 2:
-                        std_dev = np.std(recent_values)
-                    else:
-                        std_dev = adjusted_avg * 0.3  # 30% coefficient of variation
-                    
-                    # Calculate probability of exceeding threshold
-                    if std_dev > 0:
-                        z_score = (threshold - adjusted_avg) / std_dev
-                        probability = 1 - stats.norm.cdf(z_score)
-                        probability = max(0.05, min(0.95, probability))  # Clamp between 5-95%
-                    else:
-                        probability = 0.5
-                    
-                    enhanced_predictions.append({
-                        "player": player_name,
-                        "stat_type": stat_type,
-                        "threshold": threshold,
-                        "probability": round(probability, 3),
-                        "season_average": round(season_avg, 1),
-                        "recent_average": round(recent_avg, 1),
-                        "form_factor": round(form_factor, 3),
-                        "games_played": season_stats["games_played"],
-                        "recent_games_analyzed": recent_games["games_analyzed"],
-                        "recent_values": recent_values,
-                        "data_quality": "Live AFL Data",
-                        "confidence": "High" if season_stats["games_played"] > 10 else "Medium"
-                    })
-                else:
-                    # Fallback if API data unavailable
-                    enhanced_predictions.append({
-                        "player": player_name,
-                        "stat_type": stat_type,
-                        "threshold": threshold,
-                        "probability": 0.5,
-                        "data_quality": "API Error",
-                        "confidence": "Low",
-                        "error": season_stats.get("error", "Unknown error")
-                    })
+                # Recent form analysis
+                "recent_form": self._process_recent_form(recent_form),
+                
+                # Performance consistency
+                "consistency_rating": self._calculate_consistency(recent_form),
+                
+                # Venue performance (if available)
+                "venue_performance": self._extract_venue_performance(player_stats),
+                
+                # Last updated
+                "last_updated": datetime.now().isoformat()
+            }
             
-            # Calculate combined probability
-            individual_probs = [pred["probability"] for pred in enhanced_predictions]
-            combined_prob = 1.0
-            for prob in individual_probs:
-                combined_prob *= prob
+            return enhanced_data
             
-            # Apply correlation adjustments for same-team players
-            correlation_factor = 1.0
-            teams = [pred.get("team", "") for pred in enhanced_predictions]
-            if len(set(teams)) < len(teams):  # Same team players
-                correlation_factor = 0.95  # Slight positive correlation
+        except Exception as e:
+            logging.error(f"Enhanced player data error: {str(e)}")
+            return {}
+    
+    def _process_recent_form(self, recent_games: List[Dict]) -> Dict:
+        """Process recent form data"""
+        if not recent_games:
+            return {"last_5_games": [], "trend": "Unknown"}
+        
+        # Extract key stats from recent games
+        processed_games = []
+        for game in recent_games[-5:]:  # Last 5 games
+            processed_games.append({
+                "disposals": game.get("disposals", 0),
+                "goals": game.get("goals", 0),
+                "marks": game.get("marks", 0),
+                "tackles": game.get("tackles", 0),
+                "date": game.get("date", ""),
+                "opponent": game.get("opponent", ""),
+                "venue": game.get("venue", "")
+            })
+        
+        # Calculate trend
+        if len(processed_games) >= 3:
+            recent_avg = sum(g["disposals"] for g in processed_games[-3:]) / 3
+            earlier_avg = sum(g["disposals"] for g in processed_games[:-3]) / len(processed_games[:-3]) if len(processed_games) > 3 else recent_avg
             
-            final_combined_prob = combined_prob * correlation_factor
-            implied_odds = 1 / final_combined_prob if final_combined_prob > 0 else 999
+            if recent_avg > earlier_avg * 1.1:
+                trend = "Hot"
+            elif recent_avg < earlier_avg * 0.9:
+                trend = "Cold" 
+            else:
+                trend = "Average"
+        else:
+            trend = "Unknown"
+        
+        return {
+            "last_5_games": processed_games,
+            "trend": trend,
+            "recent_average_disposals": sum(g["disposals"] for g in processed_games) / len(processed_games) if processed_games else 0
+        }
+    
+    def _calculate_consistency(self, recent_games: List[Dict]) -> float:
+        """Calculate player consistency rating"""
+        if len(recent_games) < 3:
+            return 0.5
+        
+        disposals = [game.get("disposals", 0) for game in recent_games]
+        
+        if not disposals or sum(disposals) == 0:
+            return 0.5
+        
+        avg = sum(disposals) / len(disposals)
+        variance = sum((x - avg) ** 2 for x in disposals) / len(disposals)
+        std_dev = variance ** 0.5
+        
+        # Consistency score (lower std dev = higher consistency)
+        consistency = max(0, 1 - (std_dev / avg)) if avg > 0 else 0.5
+        
+        return round(consistency, 3)
+    
+    def _extract_venue_performance(self, player_stats: Dict) -> Dict:
+        """Extract venue-specific performance if available"""
+        venue_data = player_stats.get("venue_breakdown", {})
+        
+        if not venue_data:
+            return {}
+        
+        processed_venues = {}
+        for venue, stats in venue_data.items():
+            processed_venues[venue] = {
+                "disposals": stats.get("avg_disposals", 0),
+                "goals": stats.get("avg_goals", 0),
+                "games": stats.get("games_played", 0)
+            }
+        
+        return processed_venues
+    
+    async def get_team_defensive_stats(self, team_id: str) -> Dict:
+        """Get team's defensive statistics for opposition analysis"""
+        try:
+            team_stats = await self.api.get_team_statistics(team_id)
             
             return {
-                "selections": selections,
-                "enhanced_predictions": enhanced_predictions,
-                "analysis": {
-                    "individual_probabilities": individual_probs,
-                    "combined_probability": round(final_combined_prob, 4),
-                    "implied_odds": round(implied_odds, 2),
-                    "correlation_factor": correlation_factor,
-                    "data_source": "SportDevs Live AFL API",
-                    "recommendation": self._get_recommendation(final_combined_prob, implied_odds),
-                    "confidence_level": "High" if all(p.get("confidence") == "High" for p in enhanced_predictions) else "Medium"
-                },
-                "venue": venue,
-                "analysis_timestamp": datetime.now().isoformat()
+                "team_id": team_id,
+                "team_name": team_stats.get("name", "Unknown"),
+                "midfielder_disposals_allowed": team_stats.get("avg_opposition_disposals", 125),
+                "forward_goals_allowed": team_stats.get("avg_goals_conceded", 8.5),
+                "tackles_per_game": team_stats.get("avg_tackles", 65),
+                "pressure_rating": team_stats.get("pressure_factor", 1.0),
+                "defensive_efficiency": team_stats.get("defensive_efficiency", 0.5),
+                "last_updated": datetime.now().isoformat()
             }
             
         except Exception as e:
-            logging.error(f"Live SGM analysis error: {str(e)}")
-            return {"error": str(e)}
+            logging.error(f"Team defensive stats error: {str(e)}")
+            return {}
     
-    def _get_recommendation(self, probability: float, implied_odds: float) -> str:
-        """Generate betting recommendation"""
-        if probability > 0.30:
-            return f"🔥 EXCELLENT VALUE - High probability ({probability*100:.1f}%) at ${implied_odds:.2f}"
-        elif probability > 0.20:
-            return f"✅ GOOD VALUE - Decent probability ({probability*100:.1f}%) at ${implied_odds:.2f}"
-        elif probability > 0.15:
-            return f"⚠️ FAIR VALUE - Moderate probability ({probability*100:.1f}%) at ${implied_odds:.2f}"
+    async def get_match_context(self, match_id: str) -> Dict:
+        """Get comprehensive match context for predictions"""
+        try:
+            match_stats = await self.api.get_match_statistics(match_id)
+            
+            # Extract teams
+            home_team_id = match_stats.get("home_team_id")
+            away_team_id = match_stats.get("away_team_id")
+            
+            # Get team defensive stats
+            home_defense = await self.get_team_defensive_stats(home_team_id) if home_team_id else {}
+            away_defense = await self.get_team_defensive_stats(away_team_id) if away_team_id else {}
+            
+            # Get head-to-head
+            h2h_data = await self.api.get_head_to_head(home_team_id, away_team_id) if home_team_id and away_team_id else []
+            
+            return {
+                "match_id": match_id,
+                "home_team": match_stats.get("home_team", "Unknown"),
+                "away_team": match_stats.get("away_team", "Unknown"),
+                "venue": match_stats.get("venue", "Unknown"),
+                "date": match_stats.get("date", ""),
+                "round": match_stats.get("round", 0),
+                "home_team_defense": home_defense,
+                "away_team_defense": away_defense,
+                "head_to_head": h2h_data[:5],  # Last 5 H2H matches
+                "match_importance": self._assess_match_importance(match_stats),
+                "last_updated": datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            logging.error(f"Match context error: {str(e)}")
+            return {}
+    
+    def _assess_match_importance(self, match_stats: Dict) -> str:
+        """Assess the importance of the match"""
+        round_num = match_stats.get("round", 0)
+        
+        if round_num >= 22:  # Finals
+            return "Finals"
+        elif round_num >= 18:  # Late season
+            return "High"
+        elif round_num <= 3:  # Early season
+            return "Medium"
         else:
-            return f"❌ POOR VALUE - Low probability ({probability*100:.1f}%) at ${implied_odds:.2f}"
-    
-    async def close(self):
-        """Close SportDevs connection"""
-        await self.sportdevs.close()
+            return "Standard"
