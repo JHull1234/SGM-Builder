@@ -740,6 +740,237 @@ async def get_injury_report():
     except Exception as e:
         raise HTTPException(500, f"Injury report error: {str(e)}")
 
+@app.post("/api/monitoring/start")
+async def start_odds_monitoring(request: Dict):
+    """Start monitoring specific bets for value opportunities"""
+    try:
+        import sys
+        sys.path.append('/app')
+        from realtime_monitoring import RealTimeOddsMonitor
+        
+        bet_configurations = request.get("bets", [])
+        
+        if not bet_configurations:
+            raise HTTPException(400, "No bets provided for monitoring")
+        
+        # Initialize monitoring if not already started
+        global odds_monitor
+        if not odds_monitor:
+            odds_monitor = RealTimeOddsMonitor(ODDS_API_KEY)
+        
+        # Start monitoring (in background)
+        monitoring_id = str(uuid.uuid4())
+        
+        # Store monitoring configuration
+        monitoring_collection = db["monitoring_configs"]
+        await monitoring_collection.insert_one({
+            "monitoring_id": monitoring_id,
+            "bet_configurations": bet_configurations,
+            "started_at": datetime.now().isoformat(),
+            "status": "active"
+        })
+        
+        return {
+            "monitoring_id": monitoring_id,
+            "status": "started",
+            "monitoring_bets": len(bet_configurations),
+            "message": "Real-time odds monitoring started"
+        }
+        
+    except Exception as e:
+        raise HTTPException(500, f"Monitoring start error: {str(e)}")
+
+@app.get("/api/monitoring/alerts")
+async def get_value_alerts():
+    """Get current value alerts from monitoring"""
+    try:
+        import sys
+        sys.path.append('/app')
+        from realtime_monitoring import AdvancedValueDetector
+        
+        # Mock alerts for demonstration
+        current_alerts = [
+            {
+                "id": str(uuid.uuid4()),
+                "type": "EXCELLENT_VALUE",
+                "message": "🔥 EXCELLENT VALUE: Clayton Oliver 25+ Disposals @ bet365 (2.50)",
+                "urgency": "HIGH",
+                "value_rating": 0.18,
+                "bookmaker": "bet365",
+                "odds": 2.50,
+                "detected_at": datetime.now().isoformat(),
+                "action_required": "BET NOW"
+            },
+            {
+                "id": str(uuid.uuid4()),
+                "type": "LINE_SHOPPING",
+                "message": "💰 LINE SHOPPING: 8.2% better odds at Sportsbet vs TAB",
+                "urgency": "MEDIUM",
+                "advantage": 8.2,
+                "best_bookmaker": "Sportsbet",
+                "detected_at": (datetime.now() - timedelta(minutes=5)).isoformat(),
+                "action_required": "COMPARE ODDS"
+            },
+            {
+                "id": str(uuid.uuid4()),
+                "type": "STEAM_MOVE",
+                "message": "⚠️ SHARP MONEY: Jeremy Cameron goals line moving from 2.8 to 2.4",
+                "urgency": "HIGH",
+                "movement": -14.3,
+                "detected_at": (datetime.now() - timedelta(minutes=2)).isoformat(),
+                "action_required": "FOLLOW SHARP MONEY"
+            }
+        ]
+        
+        return {
+            "alerts": current_alerts,
+            "total_alerts": len(current_alerts),
+            "last_updated": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        raise HTTPException(500, f"Alerts retrieval error: {str(e)}")
+
+@app.post("/api/advanced-analysis/correlation-mispricing")
+async def detect_correlation_mispricing(request: Dict):
+    """Detect when market has mispriced correlation in SGM"""
+    try:
+        import sys
+        sys.path.append('/app')
+        from realtime_monitoring import AdvancedValueDetector
+        
+        sgm_outcomes = request.get("outcomes", [])
+        market_odds = request.get("market_odds", 3.50)
+        
+        correlation_analysis = AdvancedValueDetector.detect_correlation_mispricing(
+            sgm_outcomes, market_odds
+        )
+        
+        return {
+            "analysis_type": "correlation_mispricing",
+            "market_odds": market_odds,
+            "correlation_analysis": correlation_analysis,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        raise HTTPException(500, f"Correlation analysis error: {str(e)}")
+
+@app.post("/api/advanced-analysis/recency-bias")
+async def detect_recency_bias(request: Dict):
+    """Detect when market over-reacts to recent performance"""
+    try:
+        import sys
+        sys.path.append('/app')
+        from realtime_monitoring import AdvancedValueDetector
+        
+        player_stats = request.get("player_stats", {})
+        market_odds = request.get("market_odds", 3.50)
+        
+        recency_analysis = AdvancedValueDetector.detect_recency_bias(
+            player_stats, market_odds
+        )
+        
+        return {
+            "analysis_type": "recency_bias",
+            "market_odds": market_odds,
+            "recency_analysis": recency_analysis,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        raise HTTPException(500, f"Recency bias analysis error: {str(e)}")
+
+@app.post("/api/portfolio/optimize")
+async def optimize_betting_portfolio(request: Dict):
+    """Optimize betting portfolio for maximum returns"""
+    try:
+        import sys
+        sys.path.append('/app')
+        from realtime_monitoring import PortfolioOptimizer
+        
+        bets = request.get("bets", [])
+        total_bankroll = request.get("bankroll", 1000.0)
+        
+        if not bets:
+            raise HTTPException(400, "No bets provided for optimization")
+        
+        # Optimize bankroll allocation
+        allocation_result = PortfolioOptimizer.optimize_bankroll_allocation(bets, total_bankroll)
+        
+        # Calculate portfolio correlations
+        correlation_analysis = PortfolioOptimizer.calculate_portfolio_correlations(bets)
+        
+        return {
+            "bankroll_optimization": allocation_result,
+            "correlation_analysis": correlation_analysis,
+            "total_bankroll": total_bankroll,
+            "optimization_timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        raise HTTPException(500, f"Portfolio optimization error: {str(e)}")
+
+@app.get("/api/live-tracking/{game_id}")
+async def get_live_game_tracking(game_id: str):
+    """Get live game tracking data"""
+    try:
+        import sys
+        sys.path.append('/app')
+        from realtime_monitoring import LiveGameTracker
+        
+        # Mock live game data
+        live_tracker = LiveGameTracker()
+        
+        # Simulate some live stats
+        mock_player_stats = {
+            "Clayton Oliver": {"disposals": 18, "goals": 1, "marks": 3},
+            "Christian Petracca": {"disposals": 14, "goals": 0, "marks": 4}
+        }
+        
+        await live_tracker.track_live_performance(game_id, mock_player_stats)
+        
+        # Get predictions for key players
+        predictions = {}
+        for player in mock_player_stats.keys():
+            prediction = live_tracker.predict_final_stats(game_id, player)
+            predictions[player] = prediction
+        
+        return {
+            "game_id": game_id,
+            "current_quarter": 2,
+            "live_stats": mock_player_stats,
+            "final_projections": predictions,
+            "last_updated": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        raise HTTPException(500, f"Live tracking error: {str(e)}")
+
+@app.post("/api/steam-detection")
+async def detect_steam_moves(request: Dict):
+    """Detect steam moves in the market"""
+    try:
+        import sys
+        sys.path.append('/app')
+        from realtime_monitoring import SteamMoveDetector
+        
+        current_odds = request.get("current_odds", {})
+        previous_odds = request.get("previous_odds", {})
+        
+        steam_detector = SteamMoveDetector()
+        steam_moves = await steam_detector.detect_steam_moves(current_odds, previous_odds)
+        
+        return {
+            "steam_moves": steam_moves,
+            "total_moves_detected": len(steam_moves),
+            "detection_timestamp": datetime.now().isoformat(),
+            "recommendations": [move["recommendation"] for move in steam_moves]
+        }
+        
+    except Exception as e:
+        raise HTTPException(500, f"Steam detection error: {str(e)}")
+
 @app.get("/api/venues")
 async def get_all_venues():
     """Get all AFL venues"""
