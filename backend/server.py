@@ -216,6 +216,10 @@ squiggle_service = SquiggleService()
 ml_predictor = MachineLearningPredictor()
 automated_sgm_picker = AutomatedSGMPicker(ml_predictor)
 
+# Initialize real AFL data collector
+real_afl_data = RealAFLDataCollector()
+enhanced_sgm_analyzer = EnhancedSGMAnalyzer()
+
 # SGM Analysis Engine
 class SGMAnalyzer:
     def __init__(self):
