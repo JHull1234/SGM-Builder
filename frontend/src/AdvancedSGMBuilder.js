@@ -268,35 +268,87 @@ const AdvancedSGMBuilder = () => {
     <div className="advanced-sgm-builder">
       <div className="header-section">
         <h1>🧠 Advanced AFL SGM Builder v2.0</h1>
-        <p>Professional-grade SGM analysis with ML models, SportDevs data & advanced analytics</p>
+        <p>Professional-grade SGM analysis with ML models & live 2025 AFL data</p>
         
         <div className="feature-badges">
           <span className="badge ml">🤖 Machine Learning</span>
           <span className="badge analytics">📊 Advanced Analytics</span>
-          <span className="badge data">🏈 Real AFL Data</span>
+          <span className="badge data">🏈 Live 2025 Data</span>
           <span className="badge weather">🌤️ Weather Impact</span>
         </div>
+
+        {/* Live Data Status */}
+        {dataStatus && (
+          <div className="data-status">
+            <h3>📡 Live Data Status (2025 Season)</h3>
+            <div className="status-grid">
+              <div className="status-item">
+                <span className="label">AFL Games:</span>
+                <span className="value">{dataStatus.data_sources.squiggle_api.total_2025_games}</span>
+                <span className="status">{dataStatus.data_sources.squiggle_api.status}</span>
+              </div>
+              <div className="status-item">
+                <span className="label">Current Round:</span>
+                <span className="value">{dataStatus.data_sources.squiggle_api.current_round}</span>
+                <span className="status">✅ Live</span>
+              </div>
+              <div className="status-item">
+                <span className="label">Weather Data:</span>
+                <span className="value">{dataStatus.data_sources.weather_api.sample_data?.conditions}</span>
+                <span className="status">{dataStatus.data_sources.weather_api.status}</span>
+              </div>
+              <div className="status-item">
+                <span className="label">Betting Odds:</span>
+                <span className="value">{dataStatus.data_sources.odds_api.matches_with_odds} markets</span>
+                <span className="status">{dataStatus.data_sources.odds_api.status}</span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Live Standings */}
+      {liveStandings.length > 0 && (
+        <div className="section">
+          <h2>🏆 Live 2025 AFL Ladder</h2>
+          <div className="standings-grid">
+            {liveStandings.slice(0, 8).map((team, index) => (
+              <div key={team.id} className="standing-item">
+                <div className="position">{team.rank}</div>
+                <div className="team-name">{team.name}</div>
+                <div className="record">{team.wins}-{team.losses}{team.draws > 0 ? `-${team.draws}` : ''}</div>
+                <div className="percentage">{team.percentage?.toFixed(1)}%</div>
+                <div className="points">{team.pts} pts</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Match Selection */}
       <div className="section">
-        <h2>📅 Select Match</h2>
+        <h2>📅 Select Match (Live 2025 Data)</h2>
         <div className="matches-grid">
-          {demoMatches.map((match) => (
+          {(fixtures.length > 0 ? fixtures : demoMatches).map((match, index) => (
             <div
-              key={match.id}
+              key={match.id || index}
               className={`match-card advanced ${selectedMatch?.id === match.id ? 'selected' : ''}`}
               onClick={() => setSelectedMatch(match)}
             >
               <div className="match-teams">
-                <span className="team">{match.home_team}</span>
+                <span className="team">{match.hteam || match.home_team}</span>
                 <span className="vs">vs</span>
-                <span className="team">{match.away_team}</span>
+                <span className="team">{match.ateam || match.away_team}</span>
               </div>
               <div className="match-details">
                 <div className="venue">{match.venue}</div>
-                <div className="round">Round {match.round}</div>
+                <div className="round">{match.roundname || `Round ${match.round}`}</div>
                 <div className="date">{match.date}</div>
+                {match.complete === 100 && (
+                  <div className="score">
+                    {match.hscore} - {match.ascore} (Final)
+                  </div>
+                )}
               </div>
             </div>
           ))}
