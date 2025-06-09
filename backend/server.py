@@ -175,35 +175,201 @@ async def root():
         }
     }
 
-@api_router.get("/teams")
-async def get_teams():
-    """Get all AFL teams from SportDevs"""
+@api_router.get("/test/sportdevs")
+async def test_sportdevs_connection():
+    """Test SportDevs API connection and return detailed status"""
     if not ML_MODULES_AVAILABLE:
-        return {"teams": AFL_TEAMS}
+        return {"error": "SportDevs integration not available"}
     
     try:
-        teams = await sportdevs_api.get_teams()
+        # Test SportDevs API access
+        test_results = await sportdevs_api.test_api_access()
         
-        # Store in database
-        for team in teams:
-            team_doc = {
-                "team_id": team.get("id"),
-                "name": team.get("name"),
-                "abbreviation": team.get("abbreviation"),
-                "city": team.get("city"),
-                "founded": team.get("founded"),
-                "last_updated": datetime.utcnow()
+        return {
+            "sportdevs_test": test_results,
+            "api_key_status": "✅ Provided" if test_results["api_key_provided"] else "❌ Missing",
+            "connection_status": "✅ Connected" if test_results["base_url_found"] else "❌ Failed",
+            "teams_data": "✅ Available" if test_results["teams_accessible"] else "❌ Not accessible",
+            "players_data": "✅ Available" if test_results["players_accessible"] else "❌ Not accessible",
+            "recommendation": "SportDevs integration working!" if test_results["players_accessible"] else "Need to debug SportDevs API endpoints"
+        }
+    except Exception as e:
+        return {"error": f"SportDevs test failed: {str(e)}"}
+
+@api_router.get("/players/all")
+async def get_all_players():
+    """Get all AFL players from SportDevs"""
+    if not ML_MODULES_AVAILABLE:
+        return {"error": "SportDevs integration not available"}
+    
+    try:
+        players = await sportdevs_api.get_players()
+        
+        if players:
+            # Store players in database
+            for player in players:
+                player_doc = {
+                    "player_id": player.get("id"),
+                    "name": player.get("name"),
+                    "team_id": player.get("team_id"),
+                    "team_name": player.get("team_name"),
+                    "position": player.get("position"),
+                    "age": player.get("age"),
+                    "jersey_number": player.get("jersey_number"),
+                    "season": "2025",
+                    "last_updated": datetime.utcnow()
+                }
+                await db.players_2025.update_one(
+                    {"player_id": player_doc["player_id"]},
+                    {"$set": player_doc},
+                    upsert=True
+                )
+            
+            return {
+                "players": players,
+                "count": len(players),
+                "source": "SportDevs API",
+                "season": "2025"
             }
-            await db.teams.update_one(
-                {"team_id": team_doc["team_id"]},
-                {"$set": team_doc},
+        else:
+            return {
+                "players": [],
+                "count": 0,
+                "error": "No players returned from SportDevs API",
+                "fallback_needed": True
+            }
+    except Exception as e:
+        logging.error(f"Get all players error: {str(e)}")
+        return {"error": str(e)}
+
+@api_router.get("/players/team/{team_name}")
+async def get_players_by_team(team_name: str):
+    """Get players for a specific AFL team"""
+    if not ML_MODULES_AVAILABLE:
+        return {"error": "SportDevs integration not available"}
+    
+    try:
+        # First get all teams to find team_id
+        teams = await sportdevs_api.get_teams()
+        team_id = None
+        
+        for team in teams:
+            if team.get("name", "").lower() == team_name.lower():
+                team_id = team.get("id")
+                break
+        
+        if not team_id:
+            return {"error": f"Team '{team_name}' not found"}
+        
+        # Get players for this team
+        players = await sportdevs_api.get_players(team_id)
+        
+        return {
+            "team_name": team_name,
+            "team_id": team_id,
+            "players": players,
+            "count": len(players),
+            "source": "SportDevs API"
+        }
+    except Exception as e:
+        logging.error(f"Get team players error: {str(e)}")
+        return {"error": str(e)}
+
+@api_router.get("/player/{player_id}/stats")
+async def get_player_detailed_stats(player_id: str):
+    """Get detailed player statistics for SGM analysis"""
+    if not ML_MODULES_AVAILABLE:
+        return {"error": "SportDevs integration not available"}
+    
+    try:
+        # Get player stats from SportDevs
+        player_stats = await sportdevs_api.get_player_statistics(player_id)
+        
+        if player_stats:
+            # Enhanced processing for SGM analysis
+            sgm_relevant_stats = {
+                "player_id": player_id,
+                "name": player_stats.get("name"),
+                "team": player_stats.get("team"),
+                "position": player_stats.get("position"),
+                
+                # Key SGM statistics
+                "season_averages": {
+                    "disposals": player_stats.get("avg_disposals", 0),
+                    "goals": player_stats.get("avg_goals", 0),
+                    "marks": player_stats.get("avg_marks", 0),
+                    "tackles": player_stats.get("avg_tackles", 0),
+                    "kicks": player_stats.get("avg_kicks", 0),
+                    "handballs": player_stats.get("avg_handballs", 0)
+                },
+                
+                # Form and consistency
+                "games_played": player_stats.get("games_played", 0),
+                "consistency_rating": player_stats.get("consistency", 0),
+                
+                # SGM betting insights
+                "disposal_probability": {
+                    "15_plus": calculate_disposal_probability(player_stats, 15),
+                    "20_plus": calculate_disposal_probability(player_stats, 20),
+                    "25_plus": calculate_disposal_probability(player_stats, 25),
+                    "30_plus": calculate_disposal_probability(player_stats, 30)
+                },
+                
+                "goal_probability": {
+                    "1_plus": calculate_goal_probability(player_stats, 1),
+                    "2_plus": calculate_goal_probability(player_stats, 2),
+                    "3_plus": calculate_goal_probability(player_stats, 3)
+                },
+                
+                "last_updated": datetime.now().isoformat()
+            }
+            
+            # Store enhanced data
+            await db.player_sgm_stats.update_one(
+                {"player_id": player_id},
+                {"$set": sgm_relevant_stats},
                 upsert=True
             )
-        
-        return {"teams": teams, "count": len(teams)}
+            
+            return sgm_relevant_stats
+        else:
+            return {"error": f"No statistics found for player {player_id}"}
+            
     except Exception as e:
-        logging.error(f"Teams API error: {str(e)}")
-        return {"error": str(e), "fallback_teams": AFL_TEAMS}
+        logging.error(f"Get player stats error: {str(e)}")
+        return {"error": str(e)}
+        
+def calculate_disposal_probability(player_stats: Dict, threshold: int) -> float:
+    """Calculate probability of player getting X+ disposals"""
+    avg_disposals = player_stats.get("avg_disposals", 0)
+    if avg_disposals == 0:
+        return 0.5
+    
+    # Simple probability model based on average and variance
+    if avg_disposals >= threshold * 1.2:
+        return 0.85
+    elif avg_disposals >= threshold:
+        return 0.70
+    elif avg_disposals >= threshold * 0.8:
+        return 0.55
+    else:
+        return 0.35
+
+def calculate_goal_probability(player_stats: Dict, threshold: int) -> float:
+    """Calculate probability of player kicking X+ goals"""
+    avg_goals = player_stats.get("avg_goals", 0)
+    if avg_goals == 0:
+        return 0.2
+    
+    # Goal probability model
+    if avg_goals >= threshold * 1.5:
+        return 0.80
+    elif avg_goals >= threshold:
+        return 0.65
+    elif avg_goals >= threshold * 0.7:
+        return 0.45
+    else:
+        return 0.25
 
 @api_router.get("/players")
 async def get_players(team_id: Optional[str] = None):
