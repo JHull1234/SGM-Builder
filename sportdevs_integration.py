@@ -47,17 +47,10 @@ class SportDevsAFLAPI:
         
     async def get_teams(self) -> List[Dict]:
         """Get all AFL teams data from SportDevs"""
-        if not self.base_url:
-            await self.find_working_base_url()
-            
-        if not self.base_url:
-            logging.error("SportDevs API not accessible")
-            return []
-            
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.get(
-                    f"{self.base_url}/aussie-rules/teams",
+                    f"{self.base_url}/teams",
                     headers=self.headers,
                     timeout=15
                 )
@@ -76,18 +69,12 @@ class SportDevsAFLAPI:
     
     async def get_players(self, team_id: Optional[str] = None) -> List[Dict]:
         """Get AFL players from SportDevs"""
-        if not self.base_url:
-            await self.find_working_base_url()
-            
-        if not self.base_url:
-            return []
-            
         async with httpx.AsyncClient() as client:
             try:
-                endpoint = f"{self.base_url}/aussie-rules/players"
+                endpoint = f"{self.base_url}/players"
                 params = {}
                 if team_id:
-                    params['team_id'] = team_id
+                    params['team_id'] = f'eq.{team_id}'  # SportDevs format
                     
                 response = await client.get(
                     endpoint,
