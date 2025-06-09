@@ -3,22 +3,41 @@
 
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
-from sklearn.neural_network import MLPRegressor
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import cross_val_score
-from sklearn.metrics import mean_absolute_error
+try:
+    from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+    from sklearn.neural_network import MLPRegressor
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.model_selection import cross_val_score
+    from sklearn.metrics import mean_absolute_error
+    from sklearn.linear_model import Ridge
+    from sklearn.preprocessing import PolynomialFeatures
+    from sklearn.metrics import r2_score
+    ML_AVAILABLE = True
+except ImportError:
+    print("⚠️ ML libraries not available - using fallback predictions")
+    ML_AVAILABLE = False
+
 import requests
 import re
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 import asyncio
-import aiohttp
-from textblob import TextBlob
+try:
+    import aiohttp
+    AIOHTTP_AVAILABLE = True
+except ImportError:
+    AIOHTTP_AVAILABLE = False
+
+try:
+    from textblob import TextBlob
+    TEXTBLOB_AVAILABLE = True
+except ImportError:
+    TEXTBLOB_AVAILABLE = False
+
 import statistics
 import itertools
 from scipy import stats
-import joblib
+import uuid
 
 class MachineLearningPredictor:
     """Advanced ML models for AFL player performance prediction"""
