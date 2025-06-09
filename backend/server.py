@@ -386,7 +386,8 @@ async def analyze_sgm(request: Dict):
         
         # Store analysis in database
         analysis_collection = db["sgm_analyses"]
-        await analysis_collection.insert_one(result)
+        result_copy = result.copy()  # Make a copy for storage
+        await analysis_collection.insert_one(result_copy)
         
         return result
         
