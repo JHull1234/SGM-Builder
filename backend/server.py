@@ -1361,6 +1361,111 @@ async def live_demo_collingwood_melbourne_sgm():
         logging.error(f"Live demo SGM error: {str(e)}")
         raise HTTPException(500, f"Live demo SGM failed: {str(e)}")
 
+@api_router.get("/api-sports/test-connectivity")
+async def test_api_sports_connectivity():
+    """Test API Sports AFL integration and find working endpoints"""
+    try:
+        test_results = await api_sports_service.comprehensive_afl_test()
+        return {
+            "service": "API Sports AFL Integration",
+            "api_key_status": test_results.get("api_key_status"),
+            "test_results": test_results,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logging.error(f"API Sports test error: {str(e)}")
+        raise HTTPException(500, f"API Sports test failed: {str(e)}")
+
+@api_router.get("/api-sports/search-player/{player_name}")
+async def search_afl_player_api_sports(player_name: str):
+    """Search for AFL player using API Sports"""
+    try:
+        search_result = await api_sports_service.search_player_by_name(player_name)
+        return search_result
+    except Exception as e:
+        logging.error(f"API Sports player search error: {str(e)}")
+        raise HTTPException(500, f"Player search failed: {str(e)}")
+
+@api_router.get("/api-sports/teams")
+async def get_afl_teams_api_sports():
+    """Get AFL teams using API Sports"""
+    try:
+        teams_result = await api_sports_service.get_teams(2025)
+        return teams_result
+    except Exception as e:
+        logging.error(f"API Sports teams error: {str(e)}")
+        raise HTTPException(500, f"Teams fetch failed: {str(e)}")
+
+@api_router.get("/api-sports/matches")
+async def get_afl_matches_api_sports():
+    """Get AFL matches using API Sports"""
+    try:
+        matches_result = await api_sports_service.get_matches(2025)
+        return matches_result
+    except Exception as e:
+        logging.error(f"API Sports matches error: {str(e)}")
+        raise HTTPException(500, f"Matches fetch failed: {str(e)}")
+
+@api_router.post("/sgm/api-sports-analyze")
+async def analyze_sgm_with_api_sports(combination_data: Dict):
+    """Analyze SGM using API Sports AFL data"""
+    try:
+        venue = combination_data.get('venue', 'MCG')
+        selections = combination_data.get('selections', [])
+        
+        if not selections:
+            raise HTTPException(400, "No selections provided")
+        
+        # Get weather data
+        weather_data = await weather_service.get_weather_for_venue(venue)
+        
+        # Analyze each player using API Sports
+        api_sports_analysis = []
+        for selection in selections:
+            player_name = selection["player"]
+            stat_type = selection["stat_type"]
+            threshold = selection["threshold"]
+            
+            player_analysis = await api_sports_analyzer.analyze_player_sgm(
+                player_name, stat_type, threshold
+            )
+            api_sports_analysis.append(player_analysis)
+        
+        result = {
+            "analysis_type": "API Sports AFL Data Analysis",
+            "match_info": {
+                "venue": venue,
+                "analysis_timestamp": datetime.now().isoformat()
+            },
+            "weather_conditions": weather_data,
+            "api_sports_analysis": api_sports_analysis,
+            "selections": selections,
+            "data_sources": {
+                "player_data": "API Sports AFL API",
+                "weather": "WeatherAPI (Live)",
+                "analysis_engine": "Advanced SGM Analyzer"
+            }
+        }
+        
+        # Store analysis
+        analysis_doc = {
+            "venue": venue,
+            "selections": selections,
+            "weather_data": weather_data,
+            "api_sports_analysis": api_sports_analysis,
+            "analysis_type": "api_sports_data",
+            "created_at": datetime.utcnow()
+        }
+        await db.api_sports_sgm_analysis.insert_one(analysis_doc)
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"API Sports SGM analysis error: {str(e)}")
+        raise HTTPException(500, f"API Sports SGM analysis failed: {str(e)}")
+
 import statistics
 
 # Include the router in the main app
