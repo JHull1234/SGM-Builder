@@ -452,6 +452,320 @@ async def get_afl_teams():
     """Get all AFL teams"""
     return {"teams": AFL_TEAMS}
 
+@api_router.get("/player/{player_name}/enhanced-analysis")
+async def get_enhanced_player_analysis(player_name: str, opponent_team: str = None, venue: str = "MCG"):
+    """Get comprehensive player analysis using advanced analytics"""
+    
+    # Get enhanced player data
+    if player_name not in ENHANCED_PLAYER_DATA:
+        raise HTTPException(404, f"Enhanced data for {player_name} not available")
+    
+    player_data = ENHANCED_PLAYER_DATA[player_name]
+    
+    # Recent form analysis
+    form_analysis = {}
+    for stat in ["disposals", "goals", "marks", "tackles"]:
+        form_analysis[stat] = RecentFormAnalyzer.calculate_form_factor(player_name, stat)
+    
+    # Injury impact analysis
+    injury_analysis = InjuryImpactAnalyzer.get_injury_impact(player_name)
+    
+    # Venue performance analysis
+    venue_performance = player_data.get("venue_performance", {}).get(venue, {})
+    
+    analysis = {
+        "player": player_data,
+        "form_analysis": form_analysis,
+        "injury_analysis": injury_analysis,
+        "venue_analysis": {
+            "venue": venue,
+            "performance": venue_performance,
+            "venue_factor": venue_performance.get("disposals", 0) / player_data["avg_disposals"] if player_data["avg_disposals"] > 0 else 1.0
+        },
+        "opponent_analysis": TEAM_DEFENSIVE_STATS.get(opponent_team, {}) if opponent_team else {},
+        "recommendations": []
+    }
+    
+    # Generate recommendations based on analysis
+    if form_analysis.get("disposals", {}).get("trend") == "Hot":
+        analysis["recommendations"].append("🔥 Player in hot form - consider disposal markets")
+    
+    if injury_analysis.get("impact_rating") == "Medium":
+        analysis["recommendations"].append("⚠️ Injury concerns - reduce confidence")
+    
+    return analysis
+
+@api_router.post("/ml/predict-performance")
+async def predict_player_performance_ml(request_data: Dict):
+    """Use ML models to predict player performance"""
+    
+    player_name = request_data.get("player_name")
+    match_context = request_data.get("match_context", {})
+    
+    if player_name not in ENHANCED_PLAYER_DATA:
+        raise HTTPException(404, f"Player {player_name} not found in enhanced dataset")
+    
+    player_data = ENHANCED_PLAYER_DATA[player_name]
+    
+    # Add recent form and injury data to player context
+    player_data["recent_form"] = RecentFormAnalyzer.RECENT_FORM_DATA.get(player_name, {})
+    
+    # Get injury impact
+    injury_impact = InjuryImpactAnalyzer.get_injury_impact(player_name)
+    match_context["injury_impact"] = injury_impact.get("performance_adjustment", 0)
+    
+    # Add defensive stats for opponent
+    opponent_team = match_context.get("opponent_team")
+    if opponent_team and opponent_team in TEAM_DEFENSIVE_STATS:
+        match_context["opponent_defense"] = TEAM_DEFENSIVE_STATS[opponent_team]
+    
+    # Get ML prediction (would use trained models in production)
+    # For now, we'll use enhanced statistical prediction
+    prediction = await sgm_analyzer.calculate_player_performance_probability(
+        player_name=player_name,
+        stat_type=request_data.get("stat_type", "disposals"),
+        threshold=request_data.get("threshold", 25),
+        weather_conditions=match_context.get("weather", {}),
+        venue=match_context.get("venue", "MCG")
+    )
+    
+    # Enhance with form factors
+    for stat in ["disposals", "goals", "marks", "tackles"]:
+        form_factor = RecentFormAnalyzer.calculate_form_factor(player_name, stat)
+        if form_factor["factor"] != 1.0:
+            prediction[f"{stat}_form_adjusted"] = prediction.get(stat, 0) * form_factor["factor"]
+    
+    return {
+        "player": player_name,
+        "ml_prediction": prediction,
+        "form_factors": {
+            stat: RecentFormAnalyzer.calculate_form_factor(player_name, stat)
+            for stat in ["disposals", "goals", "marks", "tackles"]
+        },
+        "injury_impact": injury_impact,
+        "confidence_rating": "High" if injury_impact["impact_rating"] == "None" else "Medium"
+    }
+
+@api_router.post("/sgm/advanced-analyze")
+async def advanced_sgm_analysis(combination_data: Dict):
+    """Advanced SGM analysis with ML predictions and synergy analysis"""
+    try:
+        match_id = combination_data.get('match_id')
+        venue = combination_data.get('venue', 'MCG')
+        date = combination_data.get('date')
+        selections = combination_data.get('selections', [])
+        
+        if not selections:
+            raise HTTPException(400, "No selections provided")
+        
+        # Get weather data for the match
+        weather_data = await weather_service.get_weather_for_venue(venue, date)
+        
+        # Enhanced match context
+        match_context = {
+            "venue": venue,
+            "date": date,
+            "weather": weather_data
+        }
+        
+        # Calculate individual predictions with enhanced analytics
+        enhanced_predictions = []
+        sgm_outcomes = []
+        
+        for selection in selections:
+            player_name = selection.get('player')
+            stat_type = selection.get('stat_type')
+            threshold = selection.get('threshold')
+            
+            if player_name not in ENHANCED_PLAYER_DATA:
+                continue
+                
+            player_data = ENHANCED_PLAYER_DATA[player_name]
+            
+            # Get recent form factor
+            form_analysis = RecentFormAnalyzer.calculate_form_factor(player_name, stat_type)
+            
+            # Get injury impact
+            injury_analysis = InjuryImpactAnalyzer.get_injury_impact(player_name)
+            match_context["injury_impact"] = injury_analysis.get("performance_adjustment", 0)
+            
+            # Enhanced prediction with form and injury adjustments
+            base_prediction = await sgm_analyzer.calculate_player_performance_probability(
+                player_name=player_name,
+                stat_type=stat_type,
+                threshold=threshold,
+                weather_conditions=weather_data,
+                venue=venue
+            )
+            
+            # Apply form adjustment
+            form_adjusted_prob = base_prediction["probability"] * form_analysis["factor"]
+            
+            # Apply injury adjustment
+            injury_factor = 1 + injury_analysis.get("performance_adjustment", 0)
+            final_probability = form_adjusted_prob * injury_factor
+            final_probability = min(max(final_probability, 0.01), 0.99)
+            
+            enhanced_prediction = {
+                "player": player_name,
+                "stat_type": stat_type,
+                "threshold": threshold,
+                "base_probability": base_prediction["probability"],
+                "form_factor": form_analysis["factor"],
+                "injury_factor": injury_factor,
+                "final_probability": final_probability,
+                "form_trend": form_analysis["trend"],
+                "injury_status": injury_analysis["status"],
+                "confidence": base_prediction["confidence"]
+            }
+            
+            enhanced_predictions.append(enhanced_prediction)
+            
+            # For synergy analysis
+            sgm_outcomes.append({
+                "player": player_name,
+                "type": stat_type,
+                "threshold": threshold,
+                "probability": final_probability
+            })
+        
+        # Teammate synergy analysis
+        synergy_analysis = TeammateSymergyAnalyzer.calculate_synergy_impact(sgm_outcomes)
+        
+        # Combined probability with synergy adjustment
+        individual_probs = [pred["final_probability"] for pred in enhanced_predictions]
+        naive_combined_prob = 1.0
+        for prob in individual_probs:
+            naive_combined_prob *= prob
+            
+        # Apply synergy adjustment
+        synergy_multiplier = 1 + synergy_analysis["total_synergy_impact"]
+        final_combined_prob = naive_combined_prob * synergy_multiplier
+        final_combined_prob = min(max(final_combined_prob, 0.001), 0.999)
+        
+        # Calculate implied odds
+        implied_odds = 1 / final_combined_prob if final_combined_prob > 0 else 999
+        
+        # Generate recommendation
+        recommendation = "🔥 EXCELLENT VALUE" if final_combined_prob > 0.20 else \
+                        "✅ GOOD VALUE" if final_combined_prob > 0.15 else \
+                        "⚠️ FAIR VALUE" if final_combined_prob > 0.10 else \
+                        "❌ POOR VALUE"
+        
+        # Store enhanced SGM analysis
+        enhanced_sgm_doc = {
+            "match_id": match_id,
+            "venue": venue,
+            "date": date,
+            "selections": selections,
+            "weather_data": weather_data,
+            "enhanced_predictions": enhanced_predictions,
+            "synergy_analysis": synergy_analysis,
+            "combined_probability": final_combined_prob,
+            "implied_odds": round(implied_odds, 2),
+            "recommendation": recommendation,
+            "created_at": datetime.utcnow()
+        }
+        await db.enhanced_sgm_analysis.insert_one(enhanced_sgm_doc)
+        
+        return {
+            "match_info": {
+                "match_id": match_id,
+                "venue": venue,
+                "date": date
+            },
+            "weather_conditions": weather_data,
+            "enhanced_predictions": enhanced_predictions,
+            "synergy_analysis": synergy_analysis,
+            "combined_analysis": {
+                "individual_probabilities": individual_probs,
+                "naive_combined_probability": round(naive_combined_prob, 4),
+                "synergy_adjustment": round(synergy_analysis["total_synergy_impact"], 4),
+                "final_combined_probability": round(final_combined_prob, 4),
+                "implied_odds": round(implied_odds, 2),
+                "recommendation": recommendation,
+                "confidence_rating": synergy_analysis["synergy_rating"]
+            }
+        }
+        
+    except Exception as e:
+        logging.error(f"Enhanced SGM analysis error: {str(e)}")
+        raise HTTPException(500, f"Enhanced SGM analysis failed: {str(e)}")
+
+@api_router.get("/sgm/auto-recommend/{target_odds}")
+async def auto_recommend_sgm(target_odds: float, venue: str = "MCG", max_players: int = 3):
+    """Automatically recommend optimal SGM combinations for target odds"""
+    
+    try:
+        # Get available players (using our enhanced dataset)
+        available_players = list(ENHANCED_PLAYER_DATA.values())
+        
+        # Mock match context
+        match_context = {
+            "venue": venue,
+            "date": datetime.now().isoformat(),
+            "weather": await weather_service.get_weather_for_venue(venue)
+        }
+        
+        # Use automated SGM picker
+        recommendations = await automated_sgm_picker.recommend_sgm(
+            target_odds=target_odds,
+            match_context=match_context,
+            available_players=available_players[:max_players * 2]  # Limit for performance
+        )
+        
+        return recommendations
+        
+    except Exception as e:
+        logging.error(f"Auto SGM recommendation error: {str(e)}")
+        raise HTTPException(500, f"Auto recommendation failed: {str(e)}")
+
+@api_router.get("/analytics/player-dashboard/{player_name}")
+async def get_player_analytics_dashboard(player_name: str):
+    """Get comprehensive player analytics dashboard"""
+    
+    if player_name not in ENHANCED_PLAYER_DATA:
+        raise HTTPException(404, f"Player {player_name} not found")
+    
+    player_data = ENHANCED_PLAYER_DATA[player_name]
+    
+    # Form analysis across all stats
+    form_analysis = {}
+    for stat in ["disposals", "goals", "marks", "tackles"]:
+        form_analysis[stat] = RecentFormAnalyzer.calculate_form_factor(player_name, stat)
+    
+    # Injury analysis
+    injury_analysis = InjuryImpactAnalyzer.get_injury_impact(player_name)
+    
+    # Venue performance breakdown
+    venue_breakdown = []
+    for venue, performance in player_data.get("venue_performance", {}).items():
+        venue_breakdown.append({
+            "venue": venue,
+            "disposals": performance.get("disposals", 0),
+            "goals": performance.get("goals", 0),
+            "disposal_factor": performance.get("disposals", 0) / player_data["avg_disposals"] if player_data["avg_disposals"] > 0 else 1.0,
+            "goal_factor": performance.get("goals", 0) / player_data["avg_goals"] if player_data["avg_goals"] > 0 else 1.0
+        })
+    
+    return {
+        "player_info": player_data,
+        "form_analysis": form_analysis,
+        "injury_analysis": injury_analysis,
+        "venue_breakdown": venue_breakdown,
+        "betting_insights": {
+            "strongest_stat": max(form_analysis.keys(), key=lambda k: form_analysis[k]["factor"]),
+            "form_confidence": statistics.mean([form_analysis[stat]["factor"] for stat in form_analysis]),
+            "injury_risk": injury_analysis["impact_rating"],
+            "recommended_markets": [
+                f"{stat} markets" for stat, analysis in form_analysis.items() 
+                if analysis["trend"] == "Hot" and analysis["confidence"] in ["High", "Medium"]
+            ]
+        }
+    }
+
+import statistics
+
 # Include the router in the main app
 app.include_router(api_router)
 
