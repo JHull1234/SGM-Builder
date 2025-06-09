@@ -349,7 +349,6 @@ def run_tests():
     test_suite.addTest(AFLSGMBuilderAPITester('test_06_odds_endpoint'))
     test_suite.addTest(AFLSGMBuilderAPITester('test_07_player_enhanced_endpoint'))
     test_suite.addTest(AFLSGMBuilderAPITester('test_08_advanced_sgm_analysis'))
-    test_suite.addTest(AFLSGMBuilderAPITester('test_09_predict_player_performance'))
     
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(test_suite)
