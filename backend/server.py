@@ -1116,6 +1116,246 @@ async def demo_collingwood_melbourne_sgm():
         logging.error(f"Demo SGM error: {str(e)}")
         raise HTTPException(500, f"Demo SGM failed: {str(e)}")
 
+@api_router.get("/live-data/player/{player_name}/stats")
+async def get_live_player_stats(player_name: str):
+    """Get live 2025 season player statistics from SportDevs API"""
+    try:
+        stats = await sportdevs_service.get_player_season_stats(player_name)
+        if "error" in stats:
+            raise HTTPException(404, f"Player data error: {stats['error']}")
+        
+        return stats
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Live player stats error: {str(e)}")
+        raise HTTPException(500, f"Failed to fetch live player stats: {str(e)}")
+
+@api_router.get("/live-data/player/{player_name}/recent-form")
+async def get_live_player_recent_form(player_name: str, games: int = 5):
+    """Get live recent form data for player from SportDevs API"""
+    try:
+        recent_data = await sportdevs_service.get_player_recent_games(player_name, games)
+        if "error" in recent_data:
+            raise HTTPException(404, f"Recent form data error: {recent_data['error']}")
+        
+        return recent_data
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Live recent form error: {str(e)}")
+        raise HTTPException(500, f"Failed to fetch live recent form: {str(e)}")
+
+@api_router.get("/live-data/team/{team_name}/defensive-stats")
+async def get_live_team_defensive_stats(team_name: str):
+    """Get live team defensive statistics from SportDevs API"""
+    try:
+        stats = await sportdevs_service.get_team_defensive_stats(team_name)
+        if "error" in stats:
+            raise HTTPException(404, f"Team defensive data error: {stats['error']}")
+        
+        return stats
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Live team defensive stats error: {str(e)}")
+        raise HTTPException(500, f"Failed to fetch live team defensive stats: {str(e)}")
+
+@api_router.get("/live-data/injuries")
+async def get_live_injury_reports():
+    """Get current injury reports from SportDevs API"""
+    try:
+        injuries = await sportdevs_service.get_injury_reports()
+        return {
+            "injuries": injuries,
+            "count": len(injuries),
+            "data_source": "SportDevs API",
+            "updated_at": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logging.error(f"Live injury reports error: {str(e)}")
+        raise HTTPException(500, f"Failed to fetch live injury reports: {str(e)}")
+
+@api_router.get("/live-data/matches")
+async def get_live_matches():
+    """Get current round live match data from SportDevs API"""
+    try:
+        matches = await sportdevs_service.get_live_match_data()
+        return {
+            "matches": matches,
+            "count": len(matches),
+            "data_source": "SportDevs API",
+            "updated_at": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logging.error(f"Live matches error: {str(e)}")
+        raise HTTPException(500, f"Failed to fetch live matches: {str(e)}")
+
+@api_router.post("/sgm/live-analyze")
+async def analyze_live_sgm(combination_data: Dict):
+    """Analyze SGM using live SportDevs AFL data"""
+    try:
+        venue = combination_data.get('venue', 'MCG')
+        selections = combination_data.get('selections', [])
+        
+        if not selections:
+            raise HTTPException(400, "No selections provided")
+        
+        # Get live weather data
+        weather_data = await weather_service.get_weather_for_venue(venue)
+        
+        # Analyze using live AFL data from SportDevs
+        live_analysis = await live_afl_analyzer.analyze_live_sgm(
+            selections=selections,
+            venue=venue
+        )
+        
+        # Combine results
+        result = {
+            "analysis_type": "Live AFL Data Analysis (SportDevs API)",
+            "match_info": {
+                "venue": venue,
+                "analysis_timestamp": datetime.now().isoformat()
+            },
+            "weather_conditions": weather_data,
+            "live_sgm_analysis": live_analysis,
+            "data_sources": {
+                "player_stats": "SportDevs AFL API (Live 2025 Season)",
+                "weather": "WeatherAPI (Live)",
+                "analysis_engine": "Advanced Statistical Modeling"
+            }
+        }
+        
+        # Store live analysis
+        analysis_doc = {
+            "venue": venue,
+            "selections": selections,
+            "weather_data": weather_data,
+            "live_analysis": live_analysis,
+            "analysis_type": "live_sportdevs_data",
+            "created_at": datetime.utcnow()
+        }
+        await db.live_sgm_analysis.insert_one(analysis_doc)
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Live SGM analysis error: {str(e)}")
+        raise HTTPException(500, f"Live SGM analysis failed: {str(e)}")
+
+@api_router.get("/live-demo/collingwood-melbourne-sgm")
+async def live_demo_collingwood_melbourne_sgm():
+    """Live demo SGM for Collingwood vs Melbourne using SportDevs real data"""
+    try:
+        # Get live player data using SportDevs API
+        clayton_stats = await sportdevs_service.get_player_season_stats("Clayton Oliver")
+        clayton_recent = await sportdevs_service.get_player_recent_games("Clayton Oliver", 5)
+        
+        daicos_stats = await sportdevs_service.get_player_season_stats("Nick Daicos")
+        daicos_recent = await sportdevs_service.get_player_recent_games("Nick Daicos", 5)
+        
+        petracca_stats = await sportdevs_service.get_player_season_stats("Christian Petracca")
+        petracca_recent = await sportdevs_service.get_player_recent_games("Christian Petracca", 5)
+        
+        # Get current injury reports
+        injuries = await sportdevs_service.get_injury_reports()
+        
+        # Get live weather
+        weather = await weather_service.get_weather_for_venue("MCG")
+        
+        # Build realistic SGM based on actual current form
+        sgm_recommendations = []
+        
+        # Analyze Clayton Oliver's real recent form
+        if "error" not in clayton_recent and clayton_recent.get("recent_averages"):
+            recent_disposals = clayton_recent["recent_averages"]["disposals"]
+            
+            # YOUR REAL DATA: Oliver last 5 = [22, 13, 23, 31, 16] = 21.0 avg
+            # Set conservative threshold based on poor recent form
+            if recent_disposals > 0:
+                threshold = max(18, int(recent_disposals * 0.85))  # 85% of recent avg
+                sgm_recommendations.append({
+                    "player": "Clayton Oliver",
+                    "market": f"{threshold}+ Disposals",
+                    "reasoning": f"Recent avg: {recent_disposals:.1f}, conservative threshold due to inconsistent form",
+                    "risk_level": "Medium-High" if recent_disposals < 22 else "Medium"
+                })
+        
+        # Analyze Nick Daicos's real recent form  
+        if "error" not in daicos_recent and daicos_recent.get("recent_averages"):
+            recent_disposals = daicos_recent["recent_averages"]["disposals"]
+            
+            # YOUR REAL DATA: Daicos last 5 = [28, 18, 28, 38, 32] = 28.8 avg
+            # More consistent performer, can set higher threshold
+            if recent_disposals > 0:
+                threshold = max(22, int(recent_disposals * 0.8))  # 80% of recent avg
+                sgm_recommendations.append({
+                    "player": "Nick Daicos",
+                    "market": f"{threshold}+ Disposals",
+                    "reasoning": f"Recent avg: {recent_disposals:.1f}, consistent performer with good MCG record",
+                    "risk_level": "Medium"
+                })
+        
+        # Check for injury concerns
+        injury_concerns = []
+        for injury in injuries:
+            if "error" not in injury:
+                player_name = injury.get("player_name", "")
+                if any(name in player_name for name in ["Clayton Oliver", "Nick Daicos", "Christian Petracca"]):
+                    injury_concerns.append(injury)
+        
+        return {
+            "demo_title": "🏈 LIVE Collingwood vs Melbourne SGM Analysis",
+            "data_source": "SportDevs API - Live 2025 AFL Data",
+            "match_info": {
+                "teams": "Collingwood vs Melbourne",
+                "venue": "MCG",
+                "analysis_date": datetime.now().isoformat()
+            },
+            
+            "live_player_data": {
+                "clayton_oliver": {
+                    "season_stats": clayton_stats,
+                    "recent_form": clayton_recent,
+                    "api_status": "success" if "error" not in clayton_stats else "error"
+                },
+                "nick_daicos": {
+                    "season_stats": daicos_stats,
+                    "recent_form": daicos_recent,
+                    "api_status": "success" if "error" not in daicos_stats else "error"
+                },
+                "christian_petracca": {
+                    "season_stats": petracca_stats,
+                    "recent_form": petracca_recent,
+                    "api_status": "success" if "error" not in petracca_stats else "error"
+                }
+            },
+            
+            "sgm_recommendations": sgm_recommendations,
+            "injury_concerns": injury_concerns,
+            "weather_conditions": weather,
+            
+            "api_integration_status": {
+                "sportdevs_api": "Connected" if os.environ.get('SPORTDEVS_API_KEY') else "API Key Required",
+                "weather_api": "Connected",
+                "data_freshness": "Live 2025 Season Data"
+            },
+            
+            "next_steps": [
+                "1. Sign up for SportDevs API at https://sportdevs.com",
+                "2. Get your API key and add to SPORTDEVS_API_KEY environment variable",
+                "3. Test with 300 free requests per day",
+                "4. Upgrade to Major Plan (€19/month) for full access",
+                "5. Your SGM analysis will then use real live AFL data!"
+            ]
+        }
+        
+    except Exception as e:
+        logging.error(f"Live demo SGM error: {str(e)}")
+        raise HTTPException(500, f"Live demo SGM failed: {str(e)}")
+
 import statistics
 
 # Include the router in the main app
