@@ -290,7 +290,7 @@ class SimplifiedSGMPicker:
         """Analyze a specific SGM combination"""
         
         individual_probs = [outcome["implied_probability"] for outcome in sgm]
-        naive_prob = np.prod(individual_probs)
+        naive_prob = float(np.prod(individual_probs))  # Convert to Python float
         
         correlation_adjustment = self._calculate_correlation_adjustment(sgm)
         adjusted_prob = naive_prob * (1 + correlation_adjustment)
@@ -299,7 +299,7 @@ class SimplifiedSGMPicker:
         implied_odds = 1 / adjusted_prob
         value_rating = (implied_odds - target_odds) / target_odds
         
-        confidence_score = np.mean([0.7, 0.8, 0.75])
+        confidence_score = float(np.mean([0.7, 0.8, 0.75]))  # Convert to Python float
         
         meets_criteria = (
             0.8 <= implied_odds <= target_odds * 1.3 and
@@ -309,15 +309,15 @@ class SimplifiedSGMPicker:
         
         return {
             "sgm_outcomes": sgm,
-            "individual_probabilities": individual_probs,
+            "individual_probabilities": [float(p) for p in individual_probs],  # Convert to Python floats
             "naive_probability": round(naive_prob, 4),
             "correlation_adjustment": round(correlation_adjustment, 4),
             "adjusted_probability": round(adjusted_prob, 4),
             "implied_odds": round(implied_odds, 2),
-            "target_odds": target_odds,
+            "target_odds": float(target_odds),  # Ensure it's a Python float
             "value_rating": round(value_rating, 4),
             "confidence_score": round(confidence_score, 3),
-            "meets_criteria": meets_criteria,
+            "meets_criteria": bool(meets_criteria),  # Convert to Python bool
             "recommendation": self._generate_recommendation(value_rating, confidence_score, implied_odds)
         }
     
