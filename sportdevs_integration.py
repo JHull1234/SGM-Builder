@@ -24,15 +24,14 @@ class SportDevsAPIService:
             logging.warning("SPORTDEVS_API_KEY not found in environment variables")
     
     async def get_player_season_stats(self, player_name: str, season: int = 2025) -> Dict:
-        """Get complete 2025 season statistics for a player"""
+        """Get player information and available data from SportDevs API"""
         try:
-            # Search for players by name (using actual SportDevs endpoint)
+            # Search for player by name
             response = await self.session.get(
-                f"{self.base_url}/players-statistics",
+                f"{self.base_url}/players",
                 headers=self.headers,
                 params={
-                    "player_name": f"ilike.*{player_name}*",
-                    "season_id": f"eq.{season}",
+                    "name": f"ilike.*{player_name}*",
                     "limit": 5
                 }
             )
@@ -40,45 +39,34 @@ class SportDevsAPIService:
             if response.status_code != 200:
                 return {"error": f"API returned status {response.status_code}: {response.text}"}
             
-            data = response.json()
+            players = response.json()
             
-            if not data:
-                return {"error": f"No data found for player {player_name} in {season} season"}
+            if not players:
+                return {"error": f"No player found matching '{player_name}'"}
             
-            # Take the first match (best match for the name)
-            player_data = data[0]
+            # Take the best match
+            player = players[0]
+            
+            # Try to get additional statistics if available in other endpoints
+            # Note: Full statistics may require higher subscription tier
             
             return {
                 "player_name": player_name,
-                "actual_player_name": player_data.get("player_name", "Unknown"),
-                "player_id": player_data.get("player_id"),
-                "season": season,
-                "team": player_data.get("team_name", "Unknown"),
-                "league": player_data.get("league_name", "AFL"),
-                "season_stats": {
-                    "games_played": player_data.get("matches_played", 0),
-                    "goals": player_data.get("goals", 0),
-                    "disposals": player_data.get("disposals", 0),
-                    "marks": player_data.get("marks", 0),
-                    "tackles": player_data.get("tackles", 0),
-                    "kicks": player_data.get("kicks", 0),
-                    "handballs": player_data.get("handballs", 0),
-                    "goal_accuracy": player_data.get("goal_accuracy", 0),
-                    "contested_possessions": player_data.get("contested_possessions", 0),
-                    "uncontested_possessions": player_data.get("uncontested_possessions", 0)
-                },
-                "averages": {
-                    "disposals_per_game": round(player_data.get("disposals", 0) / max(player_data.get("matches_played", 1), 1), 1),
-                    "goals_per_game": round(player_data.get("goals", 0) / max(player_data.get("matches_played", 1), 1), 1),
-                    "marks_per_game": round(player_data.get("marks", 0) / max(player_data.get("matches_played", 1), 1), 1),
-                    "tackles_per_game": round(player_data.get("tackles", 0) / max(player_data.get("matches_played", 1), 1), 1)
-                },
+                "actual_player_name": player.get("name", "Unknown"),
+                "player_id": player.get("id"),
+                "team": player.get("team_name", "Unknown"),
+                "position": player.get("player_position", "Unknown"),
+                "jersey_number": player.get("player_jersey_number", "Unknown"),
+                "height": player.get("player_height", 0),
+                "date_of_birth": player.get("date_of_birth", "Unknown"),
                 "data_source": "SportDevs API",
+                "api_note": "Player profile data available. Full statistics may require higher subscription tier.",
+                "subscription_info": "Current access: Basic player profiles. Upgrade for detailed statistics.",
                 "last_updated": datetime.now().isoformat()
             }
             
         except Exception as e:
-            logging.error(f"Error fetching player stats for {player_name}: {str(e)}")
+            logging.error(f"Error fetching player data for {player_name}: {str(e)}")
             return {"error": str(e)}
     
     async def get_player_recent_games(self, player_name: str, num_games: int = 5) -> Dict:
