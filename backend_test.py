@@ -359,4 +359,10 @@ def run_tests():
 if __name__ == "__main__":
     print("🏈 Advanced AFL SGM Builder API v2.0 Test Suite")
     print("=" * 60)
+    print("🔍 Testing Live 2025 AFL Data Integration")
+    print("=" * 60)
+    print("📊 Testing backend API endpoints for 2025 AFL season data")
+    print("🏆 Verifying live ladder, fixtures, and data status")
+    print("🌤️ Checking weather integration for AFL venues")
+    print("=" * 60)
     sys.exit(run_tests())
