@@ -165,7 +165,10 @@ class SquiggleService:
 
     async def get_matches(self, year: int = 2025) -> List[Dict]:
         """Get AFL matches from Squiggle API"""
-        async with httpx.AsyncClient() as client:
+        headers = {
+            'User-Agent': 'AFL SGM Builder (https://github.com/JHull1234/SGM-Builder)'
+        }
+        async with httpx.AsyncClient(headers=headers) as client:
             try:
                 response = await client.get(
                     f"{self.base_url}/?q=games;year={year}",
