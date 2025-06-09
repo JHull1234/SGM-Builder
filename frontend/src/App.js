@@ -257,63 +257,171 @@ const SGMBuilder = () => {
       {/* SGM Analysis Results */}
       {sgmAnalysis && (
         <div className="section">
-          <h2>📊 SGM Analysis Results</h2>
+          <h2>📊 Advanced SGM Analysis Results</h2>
           
-          <div className="analysis-summary">
-            <div className="summary-item">
-              <span className="label">Combined Probability:</span>
-              <span className="value">
-                {formatProbability(sgmAnalysis.sgm_analysis.combined_probability)}
-              </span>
+          {/* Main Analysis Summary */}
+          {sgmAnalysis.combined_analysis && (
+            <div className="analysis-summary">
+              <div className="summary-item">
+                <span className="label">Combined Probability:</span>
+                <span className="value">
+                  {formatProbability(sgmAnalysis.combined_analysis.final_combined_probability)}
+                </span>
+              </div>
+              <div className="summary-item">
+                <span className="label">Implied Odds:</span>
+                <span className="value">${sgmAnalysis.combined_analysis.implied_odds}</span>
+              </div>
+              <div className="summary-item">
+                <span className="label">Recommendation:</span>
+                <span 
+                  className="value recommendation"
+                  style={{ color: getRecommendationColor(sgmAnalysis.combined_analysis.recommendation) }}
+                >
+                  {sgmAnalysis.combined_analysis.recommendation}
+                </span>
+              </div>
+              <div className="summary-item">
+                <span className="label">Synergy Rating:</span>
+                <span className="value">{sgmAnalysis.combined_analysis.confidence_rating}</span>
+              </div>
             </div>
-            <div className="summary-item">
-              <span className="label">Implied Odds:</span>
-              <span className="value">${sgmAnalysis.sgm_analysis.implied_odds}</span>
-            </div>
-            <div className="summary-item">
-              <span className="label">Recommendation:</span>
-              <span 
-                className="value recommendation"
-                style={{ color: getRecommendationColor(sgmAnalysis.sgm_analysis.recommendation) }}
-              >
-                {sgmAnalysis.sgm_analysis.recommendation.toUpperCase()}
-              </span>
-            </div>
-          </div>
+          )}
 
-          <div className="individual-predictions">
-            <h3>Individual Predictions</h3>
-            {sgmAnalysis.sgm_analysis.predictions.map((pred, index) => (
-              <div key={index} className="prediction-item">
-                <div className="prediction-header">
-                  <span className="player-name">{pred.player}</span>
-                  <span className="stat-description">
-                    {pred.threshold}+ {pred.stat_type}
+          {/* Enhanced Individual Predictions */}
+          {sgmAnalysis.enhanced_predictions && (
+            <div className="individual-predictions">
+              <h3>Enhanced Player Predictions</h3>
+              {sgmAnalysis.enhanced_predictions.map((pred, index) => (
+                <div key={index} className="prediction-item enhanced">
+                  <div className="prediction-header">
+                    <span className="player-name">{pred.player}</span>
+                    <span className="stat-description">
+                      {pred.threshold}+ {pred.stat_type}
+                    </span>
+                  </div>
+                  <div className="prediction-details">
+                    <div className="detail">
+                      <span className="detail-label">Final Probability:</span>
+                      <span className="detail-value">{formatProbability(pred.final_probability)}</span>
+                    </div>
+                    <div className="detail">
+                      <span className="detail-label">Form Impact:</span>
+                      <span className="detail-value">
+                        {pred.form_trend} ({((pred.form_factor - 1) * 100).toFixed(1)}%)
+                      </span>
+                    </div>
+                    <div className="detail">
+                      <span className="detail-label">Injury Impact:</span>
+                      <span className="detail-value">
+                        {pred.injury_status === "Healthy" ? "✅ Healthy" : 
+                         `⚠️ ${pred.injury_status}`}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Synergy Analysis */}
+          {sgmAnalysis.synergy_analysis && (
+            <div className="synergy-analysis">
+              <h3>Teammate Synergy Analysis</h3>
+              <div className="synergy-summary">
+                <div className="synergy-impact">
+                  <span className="label">Total Synergy Impact:</span>
+                  <span className="value">
+                    {(sgmAnalysis.synergy_analysis.total_synergy_impact * 100).toFixed(1)}%
                   </span>
                 </div>
-                <div className="prediction-details">
-                  <div className="detail">
-                    <span className="detail-label">Probability:</span>
-                    <span className="detail-value">{formatProbability(pred.probability)}</span>
-                  </div>
-                  <div className="detail">
-                    <span className="detail-label">Weather Impact:</span>
-                    <span className="detail-value">
-                      {pred.weather_modifier > 1 ? '⬆️' : pred.weather_modifier < 1 ? '⬇️' : '➡️'}
-                      {((pred.weather_modifier - 1) * 100).toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="detail">
-                    <span className="detail-label">Venue Impact:</span>
-                    <span className="detail-value">
-                      {pred.venue_modifier > 1 ? '⬆️' : pred.venue_modifier < 1 ? '⬇️' : '➡️'}
-                      {((pred.venue_modifier - 1) * 100).toFixed(1)}%
-                    </span>
-                  </div>
+                <div className="synergy-rating">
+                  <span className="label">Synergy Rating:</span>
+                  <span className="value">{sgmAnalysis.synergy_analysis.synergy_rating}</span>
                 </div>
               </div>
-            ))}
-          </div>
+
+              {sgmAnalysis.synergy_analysis.synergy_details && sgmAnalysis.synergy_analysis.synergy_details.length > 0 && (
+                <div className="synergy-details">
+                  {sgmAnalysis.synergy_analysis.synergy_details.map((detail, index) => (
+                    <div key={index} className="synergy-item">
+                      <div className="synergy-players">
+                        {detail.players.join(" + ")}
+                      </div>
+                      <div className="synergy-info">
+                        <span className="correlation">
+                          {detail.effect === "positive" ? "🤝" : "⚔️"} 
+                          {detail.strength} correlation ({(detail.correlation * 100).toFixed(0)}%)
+                        </span>
+                        <div className="reasoning">{detail.reasoning}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Fallback for basic SGM analysis */}
+          {sgmAnalysis.sgm_analysis && !sgmAnalysis.combined_analysis && (
+            <div className="basic-analysis">
+              <div className="analysis-summary">
+                <div className="summary-item">
+                  <span className="label">Combined Probability:</span>
+                  <span className="value">
+                    {formatProbability(sgmAnalysis.sgm_analysis.combined_probability)}
+                  </span>
+                </div>
+                <div className="summary-item">
+                  <span className="label">Implied Odds:</span>
+                  <span className="value">${sgmAnalysis.sgm_analysis.implied_odds}</span>
+                </div>
+                <div className="summary-item">
+                  <span className="label">Recommendation:</span>
+                  <span 
+                    className="value recommendation"
+                    style={{ color: getRecommendationColor(sgmAnalysis.sgm_analysis.recommendation) }}
+                  >
+                    {sgmAnalysis.sgm_analysis.recommendation.toUpperCase()}
+                  </span>
+                </div>
+              </div>
+
+              <div className="individual-predictions">
+                <h3>Individual Predictions</h3>
+                {sgmAnalysis.sgm_analysis.predictions && sgmAnalysis.sgm_analysis.predictions.map((pred, index) => (
+                  <div key={index} className="prediction-item">
+                    <div className="prediction-header">
+                      <span className="player-name">{pred.player}</span>
+                      <span className="stat-description">
+                        {pred.threshold}+ {pred.stat_type}
+                      </span>
+                    </div>
+                    <div className="prediction-details">
+                      <div className="detail">
+                        <span className="detail-label">Probability:</span>
+                        <span className="detail-value">{formatProbability(pred.probability)}</span>
+                      </div>
+                      <div className="detail">
+                        <span className="detail-label">Weather Impact:</span>
+                        <span className="detail-value">
+                          {pred.weather_modifier > 1 ? '⬆️' : pred.weather_modifier < 1 ? '⬇️' : '➡️'}
+                          {((pred.weather_modifier - 1) * 100).toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="detail">
+                        <span className="detail-label">Venue Impact:</span>
+                        <span className="detail-value">
+                          {pred.venue_modifier > 1 ? '⬆️' : pred.venue_modifier < 1 ? '⬇️' : '➡️'}
+                          {((pred.venue_modifier - 1) * 100).toFixed(1)}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
