@@ -991,6 +991,298 @@ async def detect_steam_moves(request: Dict):
     except Exception as e:
         raise HTTPException(500, f"Steam detection error: {str(e)}")
 
+@app.post("/api/ml/predict-performance")
+async def ml_predict_performance(request: Dict):
+    """Get ML predictions for player performance"""
+    try:
+        import sys
+        sys.path.append('/app')
+        from enhanced_player_data import COMPREHENSIVE_AFL_PLAYERS
+        
+        player_name = request.get("player_name")
+        match_context = request.get("match_context", {})
+        
+        if not player_name:
+            raise HTTPException(400, "player_name required")
+        
+        # Find player data
+        player_data = None
+        for player in COMPREHENSIVE_AFL_PLAYERS:
+            if player["name"].lower() == player_name.lower():
+                player_data = player
+                break
+        
+        if not player_data:
+            raise HTTPException(404, f"Player {player_name} not found")
+        
+        # Get ML prediction (using mock model for now)
+        ml_prediction = {
+            "predictions": {
+                "disposals": player_data["avg_disposals"] * 1.05,  # Slight adjustment
+                "goals": player_data["avg_goals"] * 1.03,
+                "marks": player_data["avg_marks"] * 1.02,
+                "tackles": player_data["avg_tackles"] * 1.01
+            },
+            "confidence": {
+                "disposals": 0.85,
+                "goals": 0.78,
+                "marks": 0.82,
+                "tackles": 0.80
+            },
+            "model_agreement": {
+                "disposals": 0.15,
+                "goals": 0.22,
+                "marks": 0.18,
+                "tackles": 0.20
+            }
+        }
+        
+        return {
+            "player": player_name,
+            "ml_prediction": ml_prediction,
+            "match_context": match_context,
+            "prediction_timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        raise HTTPException(500, f"ML prediction error: {str(e)}")
+
+@app.get("/api/forum/intelligence")
+async def get_forum_intelligence():
+    """Get latest forum intelligence and sharp insights"""
+    try:
+        import sys
+        sys.path.append('/app')
+        from ml_sgm_picker import ForumMonitor
+        
+        # Mock forum intelligence for demonstration
+        forum_intel = {
+            "sharp_plays": [
+                {
+                    "content": "Clayton Oliver 25+ disposals looks like value at 2.40. He's averaging 35 at MCG this year.",
+                    "author": "SharpBettor123",
+                    "source": "BigFooty",
+                    "confidence": 0.8,
+                    "upvotes": 15
+                },
+                {
+                    "content": "Jeremy Cameron under 2.5 goals. Weather forecast shows 30+ km/h winds at GMHBA.",
+                    "author": "WeatherAnalyst",
+                    "source": "Reddit",
+                    "confidence": 0.6,
+                    "upvotes": 8
+                }
+            ],
+            "injury_intel": [
+                {
+                    "content": "Hearing Petracca might be rested this week. Ribs still bothering him.",
+                    "author": "InsiderTips",
+                    "timestamp": datetime.now() - timedelta(minutes=30),
+                    "reliability": 0.9
+                }
+            ],
+            "sentiment_analysis": {
+                "Clayton Oliver": [
+                    {"polarity": 0.6, "subjectivity": 0.3, "source": "BigFooty"},
+                    {"polarity": 0.4, "subjectivity": 0.4, "source": "Reddit"}
+                ],
+                "Jeremy Cameron": [
+                    {"polarity": -0.2, "subjectivity": 0.5, "source": "Punters.com"}
+                ]
+            },
+            "last_updated": datetime.now().isoformat()
+        }
+        
+        return forum_intel
+        
+    except Exception as e:
+        raise HTTPException(500, f"Forum intelligence error: {str(e)}")
+
+@app.post("/api/ml/monte-carlo")
+async def run_monte_carlo_simulation(request: Dict):
+    """Run Monte Carlo simulation for SGM success probability"""
+    try:
+        import sys
+        sys.path.append('/app')
+        from ml_sgm_picker import AdvancedStatistics
+        
+        player_predictions = request.get("player_predictions", [])
+        num_simulations = request.get("num_simulations", 10000)
+        
+        if not player_predictions:
+            raise HTTPException(400, "player_predictions required")
+        
+        monte_carlo_result = AdvancedStatistics.monte_carlo_simulation(
+            player_predictions, num_simulations
+        )
+        
+        return {
+            "simulation_result": monte_carlo_result,
+            "input_predictions": player_predictions,
+            "analysis_timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        raise HTTPException(500, f"Monte Carlo simulation error: {str(e)}")
+
+@app.post("/api/ai/recommend-sgm")
+async def ai_recommend_sgm(request: Dict):
+    """AI-powered SGM recommendation based on target odds"""
+    try:
+        import sys
+        sys.path.append('/app')
+        from enhanced_player_data import COMPREHENSIVE_AFL_PLAYERS
+        from ml_sgm_picker import AutomatedSGMPicker, MachineLearningPredictor
+        
+        target_odds = request.get("target_odds")
+        match_context = request.get("match_context", {})
+        max_players = request.get("max_players", 4)
+        
+        if not target_odds:
+            raise HTTPException(400, "target_odds required")
+        
+        if target_odds < 1.1 or target_odds > 50:
+            raise HTTPException(400, "target_odds must be between 1.1 and 50")
+        
+        # Initialize ML predictor (mock for now)
+        ml_predictor = MachineLearningPredictor()
+        sgm_picker = AutomatedSGMPicker(ml_predictor)
+        
+        # Use available players (limit for performance)
+        available_players = COMPREHENSIVE_AFL_PLAYERS[:10]  # Top 10 players for demo
+        
+        # Get AI recommendations
+        recommendations = await sgm_picker.recommend_sgm(
+            target_odds, match_context, available_players
+        )
+        
+        # Enhanced recommendations with additional insights
+        enhanced_recommendations = []
+        for rec in recommendations["recommendations"][:3]:  # Top 3
+            
+            # Add market timing advice
+            timing_advice = {
+                "optimal_bet_time": "Tuesday-Thursday morning",
+                "avoid_after": "Friday afternoon",
+                "expected_movement": "Odds typically drift upward"
+            }
+            
+            # Add confidence breakdown
+            confidence_breakdown = {
+                "ml_confidence": rec["confidence_score"],
+                "correlation_confidence": 0.8 if rec["correlation_adjustment"] > 0 else 0.6,
+                "overall_rating": "High" if rec["confidence_score"] > 0.8 else "Medium"
+            }
+            
+            enhanced_rec = {
+                **rec,
+                "timing_advice": timing_advice,
+                "confidence_breakdown": confidence_breakdown,
+                "ai_insights": sgm_picker._generate_ai_insights(rec)
+            }
+            
+            enhanced_recommendations.append(enhanced_rec)
+        
+        return {
+            "target_odds": target_odds,
+            "ai_recommendations": enhanced_recommendations,
+            "total_combinations_analyzed": recommendations["total_combinations_analyzed"],
+            "match_context": match_context,
+            "ai_recommendation_summary": _generate_ai_summary(enhanced_recommendations, target_odds),
+            "generated_at": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        raise HTTPException(500, f"AI SGM recommendation error: {str(e)}")
+
+def _generate_ai_summary(recommendations: List[Dict], target_odds: float) -> Dict:
+    """Generate AI summary of recommendations"""
+    
+    if not recommendations:
+        return {
+            "verdict": "No suitable SGM combinations found",
+            "reason": f"Unable to find profitable combinations for target odds of {target_odds}",
+            "suggestion": "Try lower target odds or wait for better player form"
+        }
+    
+    best_rec = recommendations[0]
+    
+    if best_rec["value_rating"] > 0.1:
+        verdict = "🔥 EXCELLENT SGM OPPORTUNITIES FOUND"
+        reason = f"AI identified {len(recommendations)} high-value combinations"
+    elif best_rec["value_rating"] > 0:
+        verdict = "✅ GOOD SGM OPTIONS AVAILABLE"
+        reason = f"Positive value detected in {len(recommendations)} combinations"
+    else:
+        verdict = "⚠️ MARGINAL SGM OPTIONS"
+        reason = "Limited value but some viable options"
+    
+    # Extract key players
+    all_players = []
+    for rec in recommendations:
+        for outcome in rec["sgm_outcomes"]:
+            all_players.append(outcome["player"])
+    
+    top_players = list(set(all_players))[:3]
+    
+    return {
+        "verdict": verdict,
+        "reason": reason,
+        "top_recommended_players": top_players,
+        "best_value_rating": best_rec["value_rating"],
+        "confidence_level": best_rec["confidence_breakdown"]["overall_rating"],
+        "total_options": len(recommendations)
+    }
+
+@app.post("/api/ml/bayesian-update")
+async def bayesian_player_update(request: Dict):
+    """Bayesian update of player performance rating"""
+    try:
+        import sys
+        sys.path.append('/app')
+        from ml_sgm_picker import AdvancedStatistics
+        
+        historical_performance = request.get("historical_performance", [])
+        recent_performance = request.get("recent_performance", [])
+        
+        if not recent_performance:
+            raise HTTPException(400, "recent_performance required")
+        
+        bayesian_result = AdvancedStatistics.bayesian_player_rating(
+            historical_performance, recent_performance
+        )
+        
+        return {
+            "bayesian_update": bayesian_result,
+            "historical_data_points": len(historical_performance),
+            "recent_data_points": len(recent_performance),
+            "analysis_timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        raise HTTPException(500, f"Bayesian analysis error: {str(e)}")
+
+# Add helper method to SGMPicker class (mock implementation)
+def _generate_ai_insights(rec: Dict) -> List[str]:
+    """Generate AI insights for recommendation"""
+    insights = []
+    
+    if rec["value_rating"] > 0.15:
+        insights.append("🎯 Exceptional value detected - market has significantly underpriced this combination")
+    
+    if rec["correlation_adjustment"] > 0:
+        insights.append("🤝 Positive teammate synergy boosts success probability")
+    
+    if rec["confidence_score"] > 0.8:
+        insights.append("📊 High confidence in ML predictions for all outcomes")
+    
+    # Add outcome-specific insights
+    for outcome in rec["sgm_outcomes"]:
+        if outcome["predicted"] > outcome["target"] * 1.2:
+            insights.append(f"💪 {outcome['player']} tracking well above {outcome['stat_type']} target")
+    
+    return insights[:3]  # Return top 3 insights
+
 @app.get("/api/venues")
 async def get_all_venues():
     """Get all AFL venues"""
